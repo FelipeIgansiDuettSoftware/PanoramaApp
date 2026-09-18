@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Laboratorio de panoramas</string>
+    <string name="capture_title">Capturar panorama</string>
+    <string name="capture_subtitle">Graba una secuencia corta de frames mientras mueves el dispositivo lentamente en el eje X o Y.</string>
+    <string name="capture_overlap_hint">Mantén la misma altura y solapa la imagen anterior</string>
+    <string name="capture_counter">Frames: %1$d</string>
+    <string name="capture_button">Capturar</string>
+    <string name="capture_ready_hint">Listo para grabar a 5 FPS</string>
+    <string name="capture_recording_hint">Grabando frames a 5 FPS — mueve el dispositivo en el eje X o Y</string>
+    <string name="capture_start_recording">Iniciar grabación</string>
+    <string name="capture_stop_recording">Detener grabación</string>
+    <string name="capture_motion_detected">Movimiento detectado</string>
+    <string name="capture_motion_waiting">Esperando movimiento en X o Y</string>
+    <string name="capture_motion_detected_axis">Movimiento detectado en el eje %1$s</string>
+    <string name="capture_motion_waiting_axis">Esperando movimiento en el eje %1$s</string>
+    <string name="capture_remove_last">Eliminar última</string>
+    <string name="capture_thumbnail_description">Imagen capturada %1$d</string>
+    <string name="camera_starting">Iniciando cámara…</string>
+    <string name="camera_permission_required">Se necesita permiso de cámara para previsualizar y capturar imágenes.</string>
+    <string name="camera_grant_permission">Conceder permiso</string>
+    <string name="camera_unavailable">Cámara no disponible: %1$s</string>
+    <string name="camera_error">Error de cámara: %1$s</string>
+    <string name="process_panorama">Panorama</string>
+    <string name="process_scans">Scans</string>
+    <string name="processing_title">Procesando imágenes</string>
+    <string name="processing_mode">Modo: %1$s</string>
+    <string name="processing_progress">Progreso: %1$d%%</string>
+    <string name="result_title">Resultado del panorama</string>
+    <string name="result_summary">Modo %1$s · %2$d imágenes · %3$dx%4$d px · %5$d ms</string>
+    <string name="result_description">Panorama procesado</string>
+    <string name="result_back">Volver a la sesión</string>
+    <string name="reprocess_panorama">Procesar como panorama</string>
+    <string name="reprocess_scans">Procesar como scans</string>
+    <string name="new_session">Nueva sesión</string>
+    <string name="error_title">Algo salió mal</string>
+    <string name="error_back_to_capture">Volver a la captura</string>
+    <string name="error_save_image">No se pudo guardar la imagen capturada.</string>
+    <string name="error_save_frame">No se pudo guardar un frame.</string>
+    <string name="error_no_motion">No se detectó movimiento. Los frames de esta sesión fueron descartados.</string>
+    <string name="error_minimum_images">Captura al menos dos imágenes antes de procesar.</string>
+</resources>
