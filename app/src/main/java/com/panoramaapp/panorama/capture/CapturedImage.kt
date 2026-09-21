@@ -6,6 +6,7 @@ data class CapturedImage(
     val sequence: Int,
     val file: File,
     val capturedAtEpochMs: Long,
+    val capturedAtNanos: Long = 0L,
     val rotationDegrees: Int,
     val width: Int,
     val height: Int,

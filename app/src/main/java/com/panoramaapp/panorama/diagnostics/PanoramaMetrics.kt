@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets
 data class PanoramaMetrics(
     val sessionId: String,
     val imageCount: Int,
-    val mode: String,
     val orientation: String,
     val processingDurationMs: Long,
     val resultWidth: Int,
@@ -19,7 +18,6 @@ data class PanoramaMetrics(
             {
               "sessionId": "${sessionId.jsonEscape()}",
               "imageCount": $imageCount,
-              "mode": "${mode.jsonEscape()}",
               "orientation": "${orientation.jsonEscape()}",
               "processingDurationMs": $processingDurationMs,
               "resultWidth": $resultWidth,
@@ -27,7 +25,7 @@ data class PanoramaMetrics(
               "resultPath": "${resultPath.jsonEscape()}"
             }
         """.trimIndent() + "\n"
-        File(session.directory, "metrics-${mode.lowercase()}.json")
+        File(session.directory, "metrics.json")
             .writeText(json, StandardCharsets.UTF_8)
     }
 }

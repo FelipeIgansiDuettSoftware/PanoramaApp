@@ -15,7 +15,6 @@ import androidx.core.content.ContextCompat
 import com.panoramaapp.panorama.PanoramaUiState
 import com.panoramaapp.panorama.PanoramaViewModel
 import com.panoramaapp.panorama.camera.CameraController
-import com.panoramaapp.panorama.camera.CameraState
 import com.panoramaapp.panorama.capture.CaptureOrientation
 
 @Composable
@@ -56,10 +55,9 @@ fun PanoramaApp(
             lifecycleOwner = lifecycleOwner,
             cameraController = cameraController,
             orientation = currentOrientation,
-            isRecording = false,
-            motionDetected = false,
-            onStartRecording = { viewModel.startRecording(cameraController) },
-            onStopRecording = { viewModel.stopRecording(cameraController) },
+            isCapturing = false,
+            alignment = com.panoramaapp.panorama.camera.AlignmentGuideState(),
+            onCapturePhoto = { viewModel.capturePhoto(cameraController) },
             onRemoveLast = viewModel::removeLast,
             onProcess = viewModel::process,
             onCameraReady = viewModel::onCameraReady,
@@ -76,10 +74,9 @@ fun PanoramaApp(
             lifecycleOwner = lifecycleOwner,
             cameraController = cameraController,
             orientation = state.orientation,
-            isRecording = state.isRecording,
-            motionDetected = state.motionDetected,
-            onStartRecording = { viewModel.startRecording(cameraController) },
-            onStopRecording = { viewModel.stopRecording(cameraController) },
+            isCapturing = state.isCapturing,
+            alignment = state.alignment,
+            onCapturePhoto = { viewModel.capturePhoto(cameraController) },
             onRemoveLast = viewModel::removeLast,
             onProcess = viewModel::process,
             onCameraReady = viewModel::onCameraReady,
@@ -93,8 +90,7 @@ fun PanoramaApp(
         is PanoramaUiState.Success -> ResultScreen(
             result = state.result,
             onBack = viewModel::returnToCapture,
-            onReprocess = { viewModel.process(state.result.mode.alternate()) },
-            onNewSession = viewModel::startNewSession
+            onNewSession = { viewModel.startNewSession(cameraController) }
         )
 
         is PanoramaUiState.Error -> ErrorScreen(

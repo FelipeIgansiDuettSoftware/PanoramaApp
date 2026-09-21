@@ -4,12 +4,13 @@ import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import java.io.File
 
-data class CapturedFrame(
+data class CapturedPhoto(
     val sequence: Int,
     val file: File,
     val rotationDegrees: Int,
     val width: Int,
-    val height: Int
+    val height: Int,
+    val capturedAtNanos: Long = 0L
 )
 
 interface CameraController {
@@ -20,15 +21,20 @@ interface CameraController {
         onError: (Throwable) -> Unit
     )
 
-    fun startFrameCapture(
+    fun capturePhoto(
         outputDirectory: File,
-        firstSequence: Int,
-        frameRateFps: Int,
-        onFrameSaved: (CapturedFrame) -> Unit,
+        sequence: Int,
+        onPhotoSaved: (CapturedPhoto) -> Unit,
         onError: (Throwable) -> Unit
     )
 
-    fun stopFrameCapture(onStopped: () -> Unit)
+    fun setAlignmentReference(
+        referenceFile: File,
+        onUpdate: (AlignmentGuideState) -> Unit,
+        onError: (Throwable) -> Unit
+    )
+
+    fun clearAlignmentReference()
 
     fun shutdown()
 }

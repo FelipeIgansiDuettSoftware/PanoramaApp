@@ -36,7 +36,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.panoramaapp.R
 import com.panoramaapp.panorama.capture.CaptureOrientation
-import com.panoramaapp.panorama.processing.StitchingMode
 import com.panoramaapp.panorama.processing.StitchingResult
 import com.panoramaapp.ui.theme.PanoramaAppTheme
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +45,6 @@ import kotlinx.coroutines.withContext
 fun ResultScreen(
     result: StitchingResult,
     onBack: () -> Unit,
-    onReprocess: () -> Unit,
     onNewSession: () -> Unit,
     previewBitmap: Bitmap? = null,
 ) {
@@ -65,7 +63,6 @@ fun ResultScreen(
             result = result,
             bitmap = loadedBitmap,
             onBackToSession = onBack,
-            onReprocessAsScans = onReprocess,
             onNewSession = onNewSession,
         )
     } else {
@@ -73,7 +70,6 @@ fun ResultScreen(
             result = result,
             bitmap = loadedBitmap,
             onBackToSession = onBack,
-            onReprocessAsScans = onReprocess,
             onNewSession = onNewSession,
         )
     }
@@ -84,7 +80,6 @@ private fun PortraitResultScreen(
     result: StitchingResult,
     bitmap: Bitmap?,
     onBackToSession: () -> Unit,
-    onReprocessAsScans: () -> Unit,
     onNewSession: () -> Unit,
 ) {
     val imageScrollState = rememberScrollState()
@@ -122,7 +117,7 @@ private fun PortraitResultScreen(
                             modifier = Modifier
                                 .width(imageWidth)
                                 .height(imageHeight),
-                            contentScale = ContentScale.FillBounds,
+                            contentScale = ContentScale.Fit,
                         )
                     }
                 }
@@ -138,7 +133,6 @@ private fun PortraitResultScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 ResultBackButton(onClick = onBackToSession)
-                ResultScansButton(onClick = onReprocessAsScans)
             }
         }
 
@@ -156,7 +150,6 @@ private fun LandscapeResultScreen(
     result: StitchingResult,
     bitmap: Bitmap?,
     onBackToSession: () -> Unit,
-    onReprocessAsScans: () -> Unit,
     onNewSession: () -> Unit,
 ) {
     val imageScrollState = rememberScrollState()
@@ -199,7 +192,7 @@ private fun LandscapeResultScreen(
                                 modifier = Modifier
                                     .width(imageWidth)
                                     .height(imageHeight),
-                                contentScale = ContentScale.FillBounds,
+                                contentScale = ContentScale.Fit,
                             )
                         }
                     }
@@ -213,7 +206,6 @@ private fun LandscapeResultScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
         ) {
             ResultBackButton(onClick = onBackToSession)
-            ResultScansButton(onClick = onReprocessAsScans)
             ResultNewSessionButton(onClick = onNewSession)
         }
     }
@@ -225,7 +217,6 @@ private fun ResultHeader(result: StitchingResult) {
         Text(
             text = stringResource(
                 R.string.result_summary,
-                result.mode.name,
                 result.imageCount,
                 result.width,
                 result.height,
@@ -258,19 +249,6 @@ private fun ResultBackButton(onClick: () -> Unit) {
     ) {
         Text(
             text = stringResource(R.string.result_back),
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun ResultScansButton(onClick: () -> Unit) {
-    FilledTonalButton(
-        onClick = onClick,
-        modifier = Modifier.wrapContentWidth(),
-    ) {
-        Text(
-            text = stringResource(R.string.reprocess_scans),
             textAlign = TextAlign.Center,
         )
     }
@@ -316,7 +294,6 @@ private fun PortraitResultScreenPreview() {
         ResultScreen(
             result = previewStitchingResult(CaptureOrientation.PORTRAIT),
             onBack = {},
-            onReprocess = {},
             onNewSession = {},
             previewBitmap = rememberPreviewPanoramaBitmap(),
         )
@@ -330,7 +307,6 @@ private fun LandscapeResultScreenPreview() {
         ResultScreen(
             result = previewStitchingResult(CaptureOrientation.LANDSCAPE),
             onBack = {},
-            onReprocess = {},
             onNewSession = {},
             previewBitmap = rememberPreviewPanoramaBitmap(),
         )
@@ -343,6 +319,5 @@ private fun previewStitchingResult(orientation: CaptureOrientation) = StitchingR
     height = 1080,
     imageCount = 12,
     durationMs = 3584,
-    mode = StitchingMode.PANORAMA,
     orientation = orientation,
 )

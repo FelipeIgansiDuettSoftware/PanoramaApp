@@ -3,6 +3,7 @@ package com.panoramaapp.ui
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -49,10 +52,10 @@ import androidx.lifecycle.LifecycleOwner
 import com.panoramaapp.R
 import com.panoramaapp.panorama.camera.CameraController
 import com.panoramaapp.panorama.camera.CameraState
-import com.panoramaapp.panorama.camera.CapturedFrame
+import com.panoramaapp.panorama.camera.CapturedPhoto
+import com.panoramaapp.panorama.camera.AlignmentGuideState
 import com.panoramaapp.panorama.capture.CapturedImage
 import com.panoramaapp.panorama.capture.CaptureOrientation
-import com.panoramaapp.panorama.processing.StitchingMode
 
 @Composable
 fun CaptureScreen(
@@ -62,12 +65,11 @@ fun CaptureScreen(
     lifecycleOwner: LifecycleOwner,
     cameraController: CameraController,
     orientation: CaptureOrientation,
-    isRecording: Boolean,
-    motionDetected: Boolean,
-    onStartRecording: () -> Unit,
-    onStopRecording: () -> Unit,
+    isCapturing: Boolean,
+    alignment: AlignmentGuideState,
+    onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
-    onProcess: (StitchingMode) -> Unit,
+    onProcess: () -> Unit,
     onCameraReady: () -> Unit,
     onCameraError: (Throwable) -> Unit,
     onRequestPermission: () -> Unit
@@ -96,12 +98,11 @@ fun CaptureScreen(
             LandscapeCaptureLayout(
                 images = images,
                 orientation = orientation,
-                isRecording = isRecording,
-                motionDetected = motionDetected,
+                isCapturing = isCapturing,
+                alignment = alignment,
                 cameraReady = cameraReady,
                 cameraContent = cameraContent,
-                onStartRecording = onStartRecording,
-                onStopRecording = onStopRecording,
+                onCapturePhoto = onCapturePhoto,
                 onRemoveLast = onRemoveLast,
                 onProcess = onProcess
             )
@@ -109,12 +110,11 @@ fun CaptureScreen(
             PortraitCaptureLayout(
                 images = images,
                 orientation = orientation,
-                isRecording = isRecording,
-                motionDetected = motionDetected,
+                isCapturing = isCapturing,
+                alignment = alignment,
                 cameraReady = cameraReady,
                 cameraContent = cameraContent,
-                onStartRecording = onStartRecording,
-                onStopRecording = onStopRecording,
+                onCapturePhoto = onCapturePhoto,
                 onRemoveLast = onRemoveLast,
                 onProcess = onProcess
             )
@@ -126,14 +126,13 @@ fun CaptureScreen(
 private fun PortraitCaptureLayout(
     images: List<CapturedImage>,
     orientation: CaptureOrientation,
-    isRecording: Boolean,
-    motionDetected: Boolean,
+    isCapturing: Boolean,
+    alignment: AlignmentGuideState,
     cameraReady: Boolean,
     cameraContent: @Composable (Modifier) -> Unit,
-    onStartRecording: () -> Unit,
-    onStopRecording: () -> Unit,
+    onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
-    onProcess: (StitchingMode) -> Unit
+    onProcess: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         cameraContent(
@@ -146,9 +145,8 @@ private fun PortraitCaptureLayout(
                 .align(Alignment.TopStart)
                 .padding(20.dp)
                 .fillMaxWidth(0.72f),
-            isRecording = isRecording,
-            orientation = orientation,
-            motionDetected = motionDetected
+            isCapturing = isCapturing,
+            orientation = orientation
         )
         CounterOverlay(
             modifier = Modifier
@@ -156,13 +154,18 @@ private fun PortraitCaptureLayout(
                 .padding(20.dp),
             count = images.size
         )
+        AlignmentGuideOverlay(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 156.dp),
+            state = alignment
+        )
         PortraitCaptureControls(
             modifier = Modifier.align(Alignment.BottomCenter),
             images = images,
-            isRecording = isRecording,
+            isCapturing = isCapturing,
             cameraReady = cameraReady,
-            onStartRecording = onStartRecording,
-            onStopRecording = onStopRecording,
+            onCapturePhoto = onCapturePhoto,
             onRemoveLast = onRemoveLast,
             onProcess = onProcess
         )
@@ -173,26 +176,38 @@ private fun PortraitCaptureLayout(
 private fun LandscapeCaptureLayout(
     images: List<CapturedImage>,
     orientation: CaptureOrientation,
-    isRecording: Boolean,
-    motionDetected: Boolean,
+    isCapturing: Boolean,
+    alignment: AlignmentGuideState,
     cameraReady: Boolean,
     cameraContent: @Composable (Modifier) -> Unit,
-    onStartRecording: () -> Unit,
-    onStopRecording: () -> Unit,
+    onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
-    onProcess: (StitchingMode) -> Unit
+    onProcess: () -> Unit
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            cameraContent(Modifier.fillMaxSize().padding(8.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        ) {
+            cameraContent(
+                Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            )
             CaptureStatusOverlay(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(20.dp)
                     .fillMaxWidth(0.68f),
-                isRecording = isRecording,
-                orientation = orientation,
-                motionDetected = motionDetected
+                isCapturing = isCapturing,
+                orientation = orientation
+            )
+            AlignmentGuideOverlay(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 20.dp),
+                state = alignment
             )
         }
         LandscapeSideRail(
@@ -201,10 +216,9 @@ private fun LandscapeCaptureLayout(
                 .fillMaxHeight()
                 .background(Color.Black.copy(alpha = 0.72f)),
             images = images,
-            isRecording = isRecording,
+            isCapturing = isCapturing,
             cameraReady = cameraReady,
-            onStartRecording = onStartRecording,
-            onStopRecording = onStopRecording,
+            onCapturePhoto = onCapturePhoto,
             onRemoveLast = onRemoveLast,
             onProcess = onProcess
         )
@@ -248,8 +262,7 @@ private fun CameraViewport(
 private fun CaptureStatusOverlay(
     modifier: Modifier,
     orientation: CaptureOrientation,
-    isRecording: Boolean,
-    motionDetected: Boolean
+    isCapturing: Boolean
 ) {
     Column(
         modifier = modifier
@@ -259,21 +272,78 @@ private fun CaptureStatusOverlay(
     ) {
         Text(
             text = stringResource(
-                if (isRecording) R.string.capture_recording_hint
+                if (isCapturing) R.string.capture_saving_hint
                 else R.string.capture_ready_hint
             ),
             color = Color.White,
             style = MaterialTheme.typography.labelLarge
         )
         Text(
-            text = stringResource(
-                if (motionDetected) R.string.capture_motion_detected_axis
-                else R.string.capture_motion_waiting_axis,
-                orientation.expectedAxis.name
-            ),
+            text = stringResource(R.string.capture_overlap_hint),
             color = Color.White.copy(alpha = 0.82f),
             style = MaterialTheme.typography.labelSmall
         )
+    }
+}
+
+@Composable
+private fun AlignmentGuideOverlay(
+    modifier: Modifier,
+    state: AlignmentGuideState
+) {
+    if (!state.active) return
+    val message = when {
+        !state.hasMatch -> stringResource(R.string.alignment_find_overlap)
+        state.aligned   -> stringResource(R.string.alignment_aligned)
+        else            -> stringResource(R.string.alignment_adjust_height)
+    }
+    val guideColor = when {
+        !state.hasMatch -> Color.White.copy(alpha = 0.72f)
+        state.aligned   -> Color(0xFF78E08F)
+        else            -> Color(0xFFFFC857)
+    }
+    Column(
+        modifier = modifier
+            .width(240.dp)
+            .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = message,
+            color = guideColor,
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center
+        )
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+        ) {
+            val leftX = 26.dp.toPx()
+            val rightX = size.width - 26.dp.toPx()
+            val referenceY = size.height * state.referenceY.coerceIn(0.0, 1.0)
+            val currentY = size.height * state.currentY.coerceIn(0.0, 1.0)
+            drawLine(
+                color = guideColor.copy(alpha = 0.75f),
+                start = Offset(leftX, referenceY.toFloat()),
+                end = Offset(rightX, currentY.toFloat()),
+                strokeWidth = 2.dp.toPx()
+            )
+            drawCircle(
+                color = guideColor,
+                radius = 12.dp.toPx(),
+                center = Offset(leftX, referenceY.toFloat()),
+                style = Stroke(width = 2.dp.toPx())
+            )
+            drawCircle(
+                color = guideColor,
+                radius = 12.dp.toPx(),
+                center = Offset(rightX, currentY.toFloat()),
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
     }
 }
 
@@ -296,12 +366,11 @@ private fun CounterOverlay(modifier: Modifier, count: Int) {
 private fun PortraitCaptureControls(
     modifier: Modifier,
     images: List<CapturedImage>,
-    isRecording: Boolean,
+    isCapturing: Boolean,
     cameraReady: Boolean,
-    onStartRecording: () -> Unit,
-    onStopRecording: () -> Unit,
+    onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
-    onProcess: (StitchingMode) -> Unit
+    onProcess: () -> Unit
 ) {
     Column(
         modifier = modifier
@@ -323,14 +392,13 @@ private fun PortraitCaptureControls(
         }
         CapturePrimaryActions(
             images = images,
-            isRecording = isRecording,
+            isCapturing = isCapturing,
             cameraReady = cameraReady,
-            onStartRecording = onStartRecording,
-            onStopRecording = onStopRecording,
+            onCapturePhoto = onCapturePhoto,
             onRemoveLast = onRemoveLast
         )
         ProcessingActions(
-            enabled = images.size >= 2 && !isRecording,
+            enabled = images.size >= 2 && !isCapturing,
             onProcess = onProcess
         )
     }
@@ -340,12 +408,11 @@ private fun PortraitCaptureControls(
 private fun LandscapeSideRail(
     modifier: Modifier,
     images: List<CapturedImage>,
-    isRecording: Boolean,
+    isCapturing: Boolean,
     cameraReady: Boolean,
-    onStartRecording: () -> Unit,
-    onStopRecording: () -> Unit,
+    onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
-    onProcess: (StitchingMode) -> Unit
+    onProcess: () -> Unit
 ) {
     Column(modifier = modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
         CounterOverlay(
@@ -368,27 +435,19 @@ private fun LandscapeSideRail(
         }
         RailActionButton(
             text = stringResource(R.string.capture_remove_last),
-            enabled = images.isNotEmpty() && !isRecording,
+            enabled = images.isNotEmpty() && !isCapturing,
             onClick = onRemoveLast
         )
         RailActionButton(
-            text = stringResource(
-                if (isRecording) R.string.capture_stop_recording
-                else R.string.capture_start_recording
-            ),
-            enabled = cameraReady,
-            onClick = if (isRecording) onStopRecording else onStartRecording,
+            text = stringResource(R.string.capture_button),
+            enabled = cameraReady && !isCapturing,
+            onClick = onCapturePhoto,
             primary = true
         )
         RailActionButton(
             text = stringResource(R.string.process_panorama),
-            enabled = images.size >= 2 && !isRecording,
-            onClick = { onProcess(StitchingMode.PANORAMA) }
-        )
-        RailActionButton(
-            text = stringResource(R.string.process_scans),
-            enabled = images.size >= 2 && !isRecording,
-            onClick = { onProcess(StitchingMode.SCANS) }
+            enabled = images.size >= 2 && !isCapturing,
+            onClick = onProcess
         )
     }
 }
@@ -396,10 +455,9 @@ private fun LandscapeSideRail(
 @Composable
 private fun CapturePrimaryActions(
     images: List<CapturedImage>,
-    isRecording: Boolean,
+    isCapturing: Boolean,
     cameraReady: Boolean,
-    onStartRecording: () -> Unit,
-    onStopRecording: () -> Unit,
+    onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit
 ) {
     Row(
@@ -409,22 +467,19 @@ private fun CapturePrimaryActions(
     ) {
         OutlinedButton(
             onClick = onRemoveLast,
-            enabled = images.isNotEmpty() && !isRecording,
+            enabled = images.isNotEmpty() && !isCapturing,
             modifier = Modifier.weight(0.9f),
             contentPadding = PaddingValues(horizontal = 8.dp)
         ) {
             Text(text = stringResource(R.string.capture_remove_last), maxLines = 1)
         }
         Button(
-            onClick = if (isRecording) onStopRecording else onStartRecording,
-            enabled = cameraReady,
+            onClick = onCapturePhoto,
+            enabled = cameraReady && !isCapturing,
             modifier = Modifier.weight(1.1f)
         ) {
             Text(
-                text = stringResource(
-                    if (isRecording) R.string.capture_stop_recording
-                    else R.string.capture_start_recording
-                ),
+                text = stringResource(R.string.capture_button),
                 maxLines = 1
             )
         }
@@ -434,24 +489,18 @@ private fun CapturePrimaryActions(
 @Composable
 private fun ProcessingActions(
     enabled: Boolean,
-    onProcess: (StitchingMode) -> Unit
+    onProcess: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         FilledTonalButton(
-            onClick = { onProcess(StitchingMode.PANORAMA) },
+            onClick = onProcess,
             enabled = enabled,
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 8.dp)
         ) { Text(text = stringResource(R.string.process_panorama), maxLines = 1) }
-        FilledTonalButton(
-            onClick = { onProcess(StitchingMode.SCANS) },
-            enabled = enabled,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 8.dp)
-        ) { Text(text = stringResource(R.string.process_scans), maxLines = 1) }
     }
 }
 
@@ -472,7 +521,11 @@ private fun RailActionButton(
             modifier = buttonModifier,
             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
         ) {
-            Text(text = text, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = text,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     } else {
         FilledTonalButton(
@@ -481,7 +534,11 @@ private fun RailActionButton(
             modifier = buttonModifier,
             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
         ) {
-            Text(text = text, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = text,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
@@ -517,18 +574,22 @@ private fun CameraStateMessage(state: CameraState, onRequestPermission: () -> Un
                     CircularProgressIndicator()
                     Text(stringResource(R.string.camera_starting))
                 }
+
                 CameraState.PermissionRequired -> {
                     Text(stringResource(R.string.camera_permission_required))
                     Button(onClick = onRequestPermission) {
                         Text(stringResource(R.string.camera_grant_permission))
                     }
                 }
+
                 is CameraState.Unavailable -> {
                     Text(stringResource(R.string.camera_unavailable, state.message))
                 }
+
                 is CameraState.Error -> {
                     Text(stringResource(R.string.camera_error, state.message))
                 }
+
                 CameraState.Ready -> Unit
             }
         }
@@ -539,15 +600,23 @@ private fun CameraStateMessage(state: CameraState, onRequestPermission: () -> Un
 private fun Thumbnail(image: CapturedImage) {
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, image.file) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            BitmapFactory.Options().let { bounds ->
-                bounds.inJustDecodeBounds = true
-                BitmapFactory.decodeFile(image.file.absolutePath, bounds)
-                val sampleSize = thumbnailSampleSize(bounds.outWidth, bounds.outHeight)
-                BitmapFactory.Options().apply {
-                    inSampleSize = sampleSize
-                    inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
-                }.let { options -> BitmapFactory.decodeFile(image.file.absolutePath, options) }
-            }
+            BitmapFactory.Options()
+                .let { bounds ->
+                    bounds.inJustDecodeBounds = true
+                    BitmapFactory.decodeFile(image.file.absolutePath, bounds)
+                    val sampleSize = thumbnailSampleSize(bounds.outWidth, bounds.outHeight)
+                    BitmapFactory.Options()
+                        .apply {
+                            inSampleSize = sampleSize
+                            inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                        }
+                        .let { options ->
+                            BitmapFactory.decodeFile(
+                                image.file.absolutePath,
+                                options
+                            )
+                        }
+                }
         }
     }
     Box(
@@ -560,7 +629,10 @@ private fun Thumbnail(image: CapturedImage) {
         bitmap?.let {
             Image(
                 bitmap = it.asImageBitmap(),
-                contentDescription = stringResource(R.string.capture_thumbnail_description, image.sequence),
+                contentDescription = stringResource(
+                    R.string.capture_thumbnail_description,
+                    image.sequence
+                ),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -591,10 +663,9 @@ private fun CaptureScreenPermissionPreview() {
         lifecycleOwner = LocalLifecycleOwner.current,
         cameraController = PreviewCameraController,
         orientation = CaptureOrientation.PORTRAIT,
-        isRecording = false,
-        motionDetected = false,
-        onStartRecording = {},
-        onStopRecording = {},
+        isCapturing = false,
+        alignment = AlignmentGuideState(),
+        onCapturePhoto = {},
         onRemoveLast = {},
         onProcess = {},
         onCameraReady = {},
@@ -613,10 +684,9 @@ private fun CaptureScreenReadyPreview() {
         lifecycleOwner = LocalLifecycleOwner.current,
         cameraController = PreviewCameraController,
         orientation = CaptureOrientation.PORTRAIT,
-        isRecording = false,
-        motionDetected = false,
-        onStartRecording = {},
-        onStopRecording = {},
+        isCapturing = false,
+        alignment = AlignmentGuideState(),
+        onCapturePhoto = {},
         onRemoveLast = {},
         onProcess = {},
         onCameraReady = {},
@@ -640,10 +710,14 @@ private fun CaptureScreenLandscapePreview() {
         lifecycleOwner = LocalLifecycleOwner.current,
         cameraController = PreviewCameraController,
         orientation = CaptureOrientation.LANDSCAPE,
-        isRecording = true,
-        motionDetected = true,
-        onStartRecording = {},
-        onStopRecording = {},
+        isCapturing = true,
+        alignment = AlignmentGuideState(
+            active = true,
+            hasMatch = true,
+            referenceY = 0.5,
+            currentY = 0.53
+        ),
+        onCapturePhoto = {},
         onRemoveLast = {},
         onProcess = {},
         onCameraReady = {},
@@ -664,7 +738,8 @@ private fun CameraStateMessagePreview() {
     CameraStateMessage(CameraState.PermissionRequired) {}
 }
 
-private object PreviewCameraController : CameraController {
+private object PreviewCameraController: CameraController {
+
     override fun bindPreview(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
@@ -672,15 +747,20 @@ private object PreviewCameraController : CameraController {
         onError: (Throwable) -> Unit
     ) = Unit
 
-    override fun startFrameCapture(
+    override fun capturePhoto(
         outputDirectory: java.io.File,
-        firstSequence: Int,
-        frameRateFps: Int,
-        onFrameSaved: (CapturedFrame) -> Unit,
+        sequence: Int,
+        onPhotoSaved: (CapturedPhoto) -> Unit,
         onError: (Throwable) -> Unit
     ) = Unit
 
-    override fun stopFrameCapture(onStopped: () -> Unit) = Unit
+    override fun setAlignmentReference(
+        referenceFile: java.io.File,
+        onUpdate: (AlignmentGuideState) -> Unit,
+        onError: (Throwable) -> Unit
+    ) = Unit
+
+    override fun clearAlignmentReference() = Unit
 
     override fun shutdown() = Unit
 }

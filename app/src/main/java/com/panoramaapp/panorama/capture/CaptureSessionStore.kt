@@ -24,13 +24,15 @@ class CaptureSessionStore(context: Context) {
         sequence: Int,
         rotationDegrees: Int,
         width: Int,
-        height: Int
+        height: Int,
+        capturedAtNanos: Long = 0L
     ): CaptureSession {
         require(file.isFile && file.length() > 0) { "Captured image is empty" }
         val image = CapturedImage(
             sequence = sequence,
             file = file,
             capturedAtEpochMs = System.currentTimeMillis(),
+            capturedAtNanos = capturedAtNanos,
             rotationDegrees = rotationDegrees,
             width = width,
             height = height,
@@ -58,10 +60,6 @@ class CaptureSessionStore(context: Context) {
         return session.copy(images = session.images.dropLast(1)).also(::writeMetadata)
     }
 
-    fun resultFile(session: CaptureSession, modeName: String): File {
-        return File(session.directory, "result-${modeName.lowercase()}.jpg")
-    }
-
     private fun writeMetadata(session: CaptureSession) {
         val metadata = buildString {
             append("{\n")
@@ -74,6 +72,7 @@ class CaptureSessionStore(context: Context) {
                 append("      \"sequence\": ${image.sequence},\n")
                 append("      \"file\": \"${image.file.name}\",\n")
                 append("      \"capturedAtEpochMs\": ${image.capturedAtEpochMs},\n")
+                append("      \"capturedAtNanos\": ${image.capturedAtNanos},\n")
                 append("      \"rotationDegrees\": ${image.rotationDegrees},\n")
                 append("      \"width\": ${image.width},\n")
                 append("      \"height\": ${image.height},\n")

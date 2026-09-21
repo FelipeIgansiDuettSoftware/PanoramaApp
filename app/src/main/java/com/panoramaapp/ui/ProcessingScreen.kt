@@ -31,11 +31,6 @@ fun ProcessingScreen(state: PanoramaUiState.Processing) {
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(top = 20.dp)
         )
-        Text(
-            text = stringResource(R.string.processing_mode, state.mode.name),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp)
-        )
         state.progress?.let { Text(stringResource(R.string.processing_progress, it)) }
     }
 }
@@ -44,6 +39,6 @@ fun ProcessingScreen(state: PanoramaUiState.Processing) {
 @Composable
 private fun ProcessingScreenPreview() {
     ProcessingScreen(
-        PanoramaUiState.Processing(progress = 68, mode = com.panoramaapp.panorama.processing.StitchingMode.PANORAMA)
+        PanoramaUiState.Processing(progress = 68)
     )
 }
