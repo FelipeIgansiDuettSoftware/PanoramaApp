@@ -1,5 +1,6 @@
 package com.panoramaapp
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelProvider
 import com.panoramaapp.panorama.PanoramaViewModel
 import com.panoramaapp.panorama.camera.CameraXController
@@ -22,10 +25,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+
+        window.statusBarColor = Color.WHITE
+        window.navigationBarColor = Color.WHITE
+
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
         panoramaViewModel = ViewModelProvider(this)[PanoramaViewModel::class.java]
         cameraController = CameraXController(this)
         setContent {
-            PanoramaAppTheme {
+            PanoramaAppTheme(darkTheme = false, ) {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Box(
                         modifier = Modifier

@@ -209,7 +209,7 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
     }
 
     private fun estimateRegistration(anchor: Mat, current: Mat): Registration? {
-        for (detector in Detector.values()) {
+        for (detector in Detector.entries) {
             val anchorFeatures = extractFeatures(anchor, detector) ?: continue
             val currentFeatures = extractFeatures(current, detector)
             if (currentFeatures == null) {
@@ -472,7 +472,7 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         }
         if (angles.isEmpty()) return
         val median = angles.sorted()[angles.size / 2]
-        if (abs(median) < 0.2 || abs(median) > MAX_AUTOMATIC_TILT_CORRECTION) return
+        if (abs(median) !in 0.2 .. MAX_AUTOMATIC_TILT_CORRECTION) return
 
         val center = Point(size.first / 2.0, size.second / 2.0)
         val correction2d = Geometry.getRotationMatrix2D(center, -median, 1.0)

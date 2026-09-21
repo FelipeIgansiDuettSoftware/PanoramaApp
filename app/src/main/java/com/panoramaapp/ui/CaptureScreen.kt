@@ -3,6 +3,7 @@ package com.panoramaapp.ui
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
@@ -48,6 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
 import com.panoramaapp.R
 import com.panoramaapp.panorama.camera.CameraController
@@ -145,8 +148,7 @@ private fun PortraitCaptureLayout(
                 .align(Alignment.TopStart)
                 .padding(20.dp)
                 .fillMaxWidth(0.72f),
-            isCapturing = isCapturing,
-            orientation = orientation
+            isCapturing = isCapturing
         )
         CounterOverlay(
             modifier = Modifier
@@ -184,7 +186,7 @@ private fun LandscapeCaptureLayout(
     onRemoveLast: () -> Unit,
     onProcess: () -> Unit
 ) {
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(modifier = Modifier.fillMaxSize().padding(10.dp)) {
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -193,28 +195,26 @@ private fun LandscapeCaptureLayout(
             cameraContent(
                 Modifier
                     .fillMaxSize()
-                    .padding(8.dp)
             )
             CaptureStatusOverlay(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(20.dp)
                     .fillMaxWidth(0.68f),
-                isCapturing = isCapturing,
-                orientation = orientation
+                isCapturing = isCapturing
             )
             AlignmentGuideOverlay(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 20.dp),
+                    .align(Alignment.BottomCenter),
                 state = alignment
             )
         }
+        Spacer(Modifier.width(5.dp))
         LandscapeSideRail(
             modifier = Modifier
                 .width(132.dp)
                 .fillMaxHeight()
-                .background(Color.Black.copy(alpha = 0.72f)),
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.Black),
             images = images,
             isCapturing = isCapturing,
             cameraReady = cameraReady,
@@ -261,7 +261,6 @@ private fun CameraViewport(
 @Composable
 private fun CaptureStatusOverlay(
     modifier: Modifier,
-    orientation: CaptureOrientation,
     isCapturing: Boolean
 ) {
     Column(
@@ -528,16 +527,18 @@ private fun RailActionButton(
             )
         }
     } else {
-        FilledTonalButton(
+        OutlinedButton (
             onClick = onClick,
             enabled = enabled,
             modifier = buttonModifier,
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+            border = BorderStroke(width = 1.dp, color = Color.Gray)
         ) {
             Text(
                 text = text,
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White
             )
         }
     }
@@ -550,7 +551,7 @@ private fun CameraPreview(
     onReady: () -> Unit,
     onError: (Throwable) -> Unit
 ) {
-    androidx.compose.ui.viewinterop.AndroidView(
+    AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
             PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
@@ -653,7 +654,7 @@ private fun thumbnailSampleSize(width: Int, height: Int): Int {
     return sampleSize
 }
 
-@Preview(showBackground = true, showSystemUi = true, name = "Capture - permission")
+@Preview(showBackground = true, name = "Capture - permission")
 @Composable
 private fun CaptureScreenPermissionPreview() {
     CaptureScreen(
@@ -674,7 +675,7 @@ private fun CaptureScreenPermissionPreview() {
     )
 }
 
-@Preview(showBackground = true, showSystemUi = true, name = "Capture - ready")
+@Preview(showBackground = true, name = "Capture - ready")
 @Composable
 private fun CaptureScreenReadyPreview() {
     CaptureScreen(

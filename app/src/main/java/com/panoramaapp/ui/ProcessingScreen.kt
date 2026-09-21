@@ -35,7 +35,7 @@ fun ProcessingScreen(state: PanoramaUiState.Processing) {
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true, name = "Processing")
+@Preview(showBackground = true, name = "Processing")
 @Composable
 private fun ProcessingScreenPreview() {
     ProcessingScreen(

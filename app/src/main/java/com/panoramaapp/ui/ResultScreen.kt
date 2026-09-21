@@ -9,18 +9,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,10 +33,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.panoramaapp.R
@@ -87,11 +94,18 @@ private fun PortraitResultScreen(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
+            .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ResultHeader(result = result)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ResultBackButton(onClick = onBackToSession)
+            ResultHeader(result = result)
+            ResultNewSessionButton(onClick = onNewSession)
+        }
 
         ResultImageSurface(
             modifier = Modifier
@@ -123,25 +137,6 @@ private fun PortraitResultScreen(
                 }
             }
         }
-
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            Row(
-                modifier = Modifier.horizontalScroll(actionScrollState),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                ResultBackButton(onClick = onBackToSession)
-            }
-        }
-
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            ResultNewSessionButton(onClick = onNewSession)
-        }
     }
 }
 
@@ -156,8 +151,7 @@ private fun LandscapeResultScreen(
 
     Row(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+            .fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(
@@ -166,7 +160,15 @@ private fun LandscapeResultScreen(
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ResultHeader(result = result)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ResultBackButton(onClick = onBackToSession)
+                ResultHeader(result = result)
+                ResultNewSessionButton(onClick = onNewSession)
+            }
 
             ResultImageSurface(
                 modifier = Modifier
@@ -199,33 +201,24 @@ private fun LandscapeResultScreen(
                 }
             }
         }
-
-        Column(
-            modifier = Modifier.wrapContentWidth(),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-        ) {
-            ResultBackButton(onClick = onBackToSession)
-            ResultNewSessionButton(onClick = onNewSession)
-        }
     }
 }
 
 @Composable
 private fun ResultHeader(result: StitchingResult) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(
-                R.string.result_summary,
-                result.imageCount,
-                result.width,
-                result.height,
-                result.durationMs,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    Text(
+        text = stringResource(
+            R.string.result_summary,
+            result.imageCount,
+            result.width,
+            result.height,
+            result.durationMs,
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        overflow = TextOverflow.Ellipsis,
+        maxLines = 2
+    )
 }
 
 @Composable
@@ -246,32 +239,28 @@ private fun ResultBackButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier.wrapContentWidth(),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+        contentPadding = PaddingValues(0.dp)
     ) {
-        Text(
-            text = stringResource(R.string.result_back),
-            textAlign = TextAlign.Center,
-        )
+        Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.Black)
     }
 }
 
 @Composable
 private fun ResultNewSessionButton(onClick: () -> Unit) {
-    FilledTonalButton(
+    FloatingActionButton(
         onClick = onClick,
-        modifier = Modifier.wrapContentWidth(),
+        containerColor = Color(red = 0, green = 0, blue = 0, alpha = 100)
     ) {
-        Text(
-            text = stringResource(R.string.new_session),
-            textAlign = TextAlign.Center,
-        )
+        Icon(Icons.Default.Add, contentDescription = null)
     }
 }
 
 private fun decodeResultBitmap(path: String): Bitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    val bounds = BitmapFactory.Options()
+        .apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
     val maxDimension = maxOf(bounds.outWidth, bounds.outHeight)
     var sampleSize = 1
     while (maxDimension / sampleSize > 4096) {
@@ -280,10 +269,11 @@ private fun decodeResultBitmap(path: String): Bitmap? {
 
     return BitmapFactory.decodeFile(
         path,
-        BitmapFactory.Options().apply {
-            inSampleSize = sampleSize
-            inPreferredConfig = Bitmap.Config.RGB_565
-        },
+        BitmapFactory.Options()
+            .apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            },
     )
 }
 

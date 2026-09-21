@@ -146,10 +146,6 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
-    override fun onCleared() {
-        super.onCleared()
-    }
-
     private fun registerPhoto(frame: CapturedPhoto, cameraController: CameraController) {
         capturing = false
         runCatching {
