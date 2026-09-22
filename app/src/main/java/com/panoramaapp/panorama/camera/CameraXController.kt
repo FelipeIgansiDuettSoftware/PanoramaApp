@@ -12,6 +12,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.LifecycleOwner
+import com.panoramaapp.panorama.capture.CaptureOrientation
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ExecutorService
@@ -153,6 +154,8 @@ class CameraXController(context: Context) : CameraController {
 
     override fun setAlignmentReference(
         referenceFile: File,
+        orientation: CaptureOrientation,
+        expectedDirection: AlignmentDirection?,
         onUpdate: (AlignmentGuideState) -> Unit,
         onError: (Throwable) -> Unit
     ) {
@@ -167,7 +170,7 @@ class CameraXController(context: Context) : CameraController {
         }
         clearAlignmentReference()
         runCatching {
-            AlignmentGuideAnalyzer(referenceFile, onUpdate).also { analyzer ->
+            AlignmentGuideAnalyzer(referenceFile, orientation, expectedDirection, onUpdate).also { analyzer ->
                 alignmentAnalyzer = analyzer
                 analysis.setAnalyzer(analysisExecutor, analyzer)
             }

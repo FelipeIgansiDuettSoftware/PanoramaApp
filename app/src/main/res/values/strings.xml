@@ -11,6 +11,15 @@
     <string name="alignment_find_overlap">Move slowly until the overlap is found</string>
     <string name="alignment_aligned">Aligned</string>
     <string name="alignment_adjust_height">Adjust the height</string>
+    <string name="alignment_keep_axis">Keep the same movement axis</string>
+    <string name="alignment_keep_direction">Keep moving in the same direction</string>
+    <string name="alignment_move_forward">Continue moving in the indicated direction</string>
+    <string name="alignment_move_back">Return toward the previous frame</string>
+    <string name="alignment_insufficient_overlap">Move back toward the previous frame</string>
+    <string name="alignment_move_right">Move the camera to the right</string>
+    <string name="alignment_move_left">Move the camera to the left</string>
+    <string name="alignment_move_down">Move the camera down</string>
+    <string name="alignment_move_up">Move the camera up</string>
     <string name="capture_remove_last">Remove last</string>
     <string name="capture_thumbnail_description">Captured image %1$d</string>
     <string name="camera_starting">Starting camera…</string>

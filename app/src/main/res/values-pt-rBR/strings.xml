@@ -11,6 +11,15 @@
     <string name="alignment_find_overlap">Mova devagar até encontrar a sobreposição</string>
     <string name="alignment_aligned">Alinhado</string>
     <string name="alignment_adjust_height">Ajuste a altura</string>
+    <string name="alignment_keep_axis">Mantenha o mesmo eixo de movimento</string>
+    <string name="alignment_keep_direction">Continue na mesma direção</string>
+    <string name="alignment_move_forward">Continue na direção indicada</string>
+    <string name="alignment_move_back">Volte em direção ao quadro anterior</string>
+    <string name="alignment_insufficient_overlap">Volte em direção ao quadro anterior</string>
+    <string name="alignment_move_right">Mova a câmera para a direita</string>
+    <string name="alignment_move_left">Mova a câmera para a esquerda</string>
+    <string name="alignment_move_down">Mova a câmera para baixo</string>
+    <string name="alignment_move_up">Mova a câmera para cima</string>
     <string name="capture_remove_last">Remover última</string>
     <string name="capture_thumbnail_description">Imagem capturada %1$d</string>
     <string name="camera_starting">Iniciando câmera…</string>

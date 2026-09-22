@@ -9,6 +9,8 @@ import com.panoramaapp.panorama.camera.CameraController
 import com.panoramaapp.panorama.camera.CameraState
 import com.panoramaapp.panorama.camera.CapturedPhoto
 import com.panoramaapp.panorama.camera.AlignmentGuideState
+import com.panoramaapp.panorama.camera.AlignmentDirection
+import com.panoramaapp.panorama.camera.AlignmentGuidance
 import com.panoramaapp.panorama.capture.CaptureSession
 import com.panoramaapp.panorama.capture.CaptureOrientation
 import com.panoramaapp.panorama.capture.CaptureSessionStore
@@ -25,6 +27,16 @@ import kotlinx.coroutines.withContext
 class PanoramaViewModel(application: Application) : AndroidViewModel(application) {
     private companion object { const val TAG = "PanoramaViewModel" }
 
+    private enum class CapturePhase {
+        WAITING_FOR_FIRST_PHOTO,
+        WAITING_FOR_MOVEMENT,
+        CAPTURING_PHOTO,
+        REGISTERING_PHOTO,
+        PROCESSING,
+        FINISHED,
+        ERROR
+    }
+
     private val sessionStore = CaptureSessionStore(application)
     private val appContext = application
     private val processor: PanoramaProcessor = OpenCvPanoramaProcessor(application)
@@ -33,6 +45,8 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
     @Volatile
     private var capturing = false
     private var alignmentGuide = AlignmentGuideState()
+    private var motionDirection: AlignmentDirection? = null
+    private var capturePhase = CapturePhase.WAITING_FOR_FIRST_PHOTO
 
     private val _uiState = MutableStateFlow<PanoramaUiState>(PanoramaUiState.CameraStarting)
     val uiState: StateFlow<PanoramaUiState> = _uiState
@@ -65,9 +79,16 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
         showCaptureState()
     }
 
-    fun capturePhoto(cameraController: CameraController) {
+    fun capturePhoto(cameraController: CameraController, automatic: Boolean = false) {
         if (capturing || _cameraState.value != CameraState.Ready) return
+        val currentImageCount = synchronized(sessionLock) { session.images.size }
+        if (automatic && capturePhase != CapturePhase.WAITING_FOR_MOVEMENT) return
+        if (!automatic && currentImageCount == 0 && capturePhase != CapturePhase.WAITING_FOR_FIRST_PHOTO) return
+        if (!automatic && currentImageCount > 0 &&
+            (capturePhase != CapturePhase.WAITING_FOR_MOVEMENT || !alignmentGuide.captureAllowed)
+        ) return
         capturing = true
+        capturePhase = CapturePhase.CAPTURING_PHOTO
         val orientation = currentCaptureOrientation()
         val currentSession = synchronized(sessionLock) {
             session = sessionStore.setOrientation(session, orientation)
@@ -86,14 +107,43 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
         publishCaptureState()
     }
 
-    fun removeLast() {
+    fun removeLast(cameraController: CameraController) {
         if (capturing) return
         val result = runCatching {
             synchronized(sessionLock) { session = sessionStore.removeLast(session) }
         }
         result.onFailure {
+            capturePhase = CapturePhase.ERROR
             _uiState.value = PanoramaUiState.Error(it.message ?: "Unable to remove frame")
-        }.onSuccess { publishCaptureState() }
+        }.onSuccess {
+            val remaining = synchronized(sessionLock) { session.images.lastOrNull() }
+            if (remaining == null) {
+                cameraController.clearAlignmentReference()
+                motionDirection = null
+                alignmentGuide = AlignmentGuideState()
+                capturePhase = CapturePhase.WAITING_FOR_FIRST_PHOTO
+                publishCaptureState()
+            } else {
+                capturePhase = CapturePhase.WAITING_FOR_MOVEMENT
+                cameraController.setAlignmentReference(
+                    referenceFile = remaining.file,
+                    orientation = currentCaptureOrientation(),
+                    expectedDirection = motionDirection,
+                    onUpdate = { update ->
+                        viewModelScope.launch(Dispatchers.Main) {
+                            if (motionDirection == null && update.direction != null) motionDirection = update.direction
+                            alignmentGuide = update
+                            if (_uiState.value is PanoramaUiState.Capturing) publishCaptureState()
+                            if (_uiState.value is PanoramaUiState.Capturing && update.captureAllowed && !capturing) {
+                                capturePhoto(cameraController, automatic = true)
+                            }
+                        }
+                    },
+                    onError = { error -> Log.w(TAG, "Alignment guide unavailable", error) }
+                )
+                publishCaptureState()
+            }
+        }
     }
 
     fun process() {
@@ -105,6 +155,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
             return
         }
         _uiState.value = PanoramaUiState.Processing(progress = null)
+        capturePhase = CapturePhase.PROCESSING
         viewModelScope.launch {
             runCatching {
                 processor.stitch(
@@ -113,10 +164,12 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
                 )
             }
                 .onSuccess { result ->
+                    capturePhase = CapturePhase.FINISHED
                     writeMetrics(result)
                     _uiState.value = PanoramaUiState.Success(result)
                 }
                 .onFailure { error ->
+                    capturePhase = CapturePhase.ERROR
                     Log.e(TAG, "Panorama processing failed: session=${session.id}", error)
                     _uiState.value = PanoramaUiState.Error(
                         error.message ?: "Panorama processing failed"
@@ -127,12 +180,19 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
 
     fun returnToCapture() {
         capturing = false
+        capturePhase = if (synchronized(sessionLock) { session.images.isEmpty() }) {
+            CapturePhase.WAITING_FOR_FIRST_PHOTO
+        } else {
+            CapturePhase.WAITING_FOR_MOVEMENT
+        }
         publishCaptureState()
     }
 
     fun startNewSession(cameraController: CameraController) {
         cameraController.clearAlignmentReference()
         alignmentGuide = AlignmentGuideState()
+        motionDirection = null
+        capturePhase = CapturePhase.WAITING_FOR_FIRST_PHOTO
         val replacement = synchronized(sessionLock) {
             sessionStore.deleteSession(session)
             sessionStore.createSession()
@@ -148,6 +208,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
 
     private fun registerPhoto(frame: CapturedPhoto, cameraController: CameraController) {
         capturing = false
+        capturePhase = CapturePhase.REGISTERING_PHOTO
         runCatching {
             synchronized(sessionLock) {
                 session = sessionStore.registerImage(
@@ -167,14 +228,23 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
                 it.message ?: appContext.getString(R.string.error_save_image)
             )
         }.onSuccess {
-            alignmentGuide = AlignmentGuideState(active = true)
+            alignmentGuide = AlignmentGuideState(active = true, guidance = AlignmentGuidance.FIND_OVERLAP)
+            capturePhase = CapturePhase.WAITING_FOR_MOVEMENT
             publishCaptureState()
             cameraController.setAlignmentReference(
                 referenceFile = frame.file,
+                orientation = currentCaptureOrientation(),
+                expectedDirection = motionDirection,
                 onUpdate = { update ->
                     viewModelScope.launch(Dispatchers.Main) {
+                        if (motionDirection == null && update.direction != null) {
+                            motionDirection = update.direction
+                        }
                         alignmentGuide = update
                         if (_uiState.value is PanoramaUiState.Capturing) publishCaptureState()
+                        if (_uiState.value is PanoramaUiState.Capturing && update.captureAllowed && !capturing) {
+                            capturePhoto(cameraController, automatic = true)
+                        }
                     }
                 },
                 onError = { error ->
@@ -186,6 +256,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
 
     private fun failCapture(error: Throwable) {
         capturing = false
+        capturePhase = CapturePhase.ERROR
         Log.e(TAG, "Photo capture failed", error)
         _uiState.value = PanoramaUiState.Error(
             error.message ?: appContext.getString(R.string.error_save_image)

@@ -35,8 +35,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,6 +84,7 @@ fun CaptureScreen(
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val cameraReady = cameraState == CameraState.Ready
+    val canCapture = images.isEmpty() || alignment.captureAllowed
     val cameraContent: @Composable (Modifier) -> Unit = { modifier ->
         CameraViewport(
             modifier = modifier,
@@ -105,6 +109,7 @@ fun CaptureScreen(
                 isCapturing = isCapturing,
                 alignment = alignment,
                 cameraReady = cameraReady,
+                canCapture = canCapture,
                 cameraContent = cameraContent,
                 onCapturePhoto = onCapturePhoto,
                 onRemoveLast = onRemoveLast,
@@ -116,6 +121,7 @@ fun CaptureScreen(
                 isCapturing = isCapturing,
                 alignment = alignment,
                 cameraReady = cameraReady,
+                canCapture = canCapture,
                 cameraContent = cameraContent,
                 onCapturePhoto = onCapturePhoto,
                 onRemoveLast = onRemoveLast,
@@ -131,6 +137,7 @@ private fun PortraitCaptureLayout(
     isCapturing: Boolean,
     alignment: AlignmentGuideState,
     cameraReady: Boolean,
+    canCapture: Boolean,
     cameraContent: @Composable (Modifier) -> Unit,
     onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
@@ -154,6 +161,7 @@ private fun PortraitCaptureLayout(
                 images = images,
                 isCapturing = isCapturing,
                 cameraReady = cameraReady,
+                canCapture = canCapture,
                 onCapturePhoto = onCapturePhoto,
                 onRemoveLast = onRemoveLast,
                 onProcess = onProcess
@@ -168,6 +176,7 @@ private fun LandscapeCaptureLayout(
     isCapturing: Boolean,
     alignment: AlignmentGuideState,
     cameraReady: Boolean,
+    canCapture: Boolean,
     cameraContent: @Composable (Modifier) -> Unit,
     onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
@@ -194,6 +203,7 @@ private fun LandscapeCaptureLayout(
                 images = images,
                 isCapturing = isCapturing,
                 cameraReady = cameraReady,
+                canCapture = canCapture,
                 onCapturePhoto = onCapturePhoto,
                 onRemoveLast = onRemoveLast,
                 onProcess = onProcess
@@ -240,14 +250,37 @@ private fun AlignmentGuideOverlay(
 ) {
     if (!state.active) return
     val message = when {
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.READY -> stringResource(R.string.capture_ready_hint)
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.CAPTURE_READY -> stringResource(R.string.alignment_aligned)
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.OUT_OF_AXIS -> stringResource(R.string.alignment_keep_axis)
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.KEEP_DIRECTION -> stringResource(R.string.alignment_keep_direction)
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.INSUFFICIENT_OVERLAP -> stringResource(R.string.alignment_insufficient_overlap)
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.MOVE_POSITIVE -> when (state.axis) {
+            com.panoramaapp.panorama.camera.AlignmentAxis.HORIZONTAL -> stringResource(R.string.alignment_move_right)
+            com.panoramaapp.panorama.camera.AlignmentAxis.VERTICAL -> stringResource(R.string.alignment_move_down)
+        }
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.MOVE_NEGATIVE -> when (state.axis) {
+            com.panoramaapp.panorama.camera.AlignmentAxis.HORIZONTAL -> stringResource(R.string.alignment_move_left)
+            com.panoramaapp.panorama.camera.AlignmentAxis.VERTICAL -> stringResource(R.string.alignment_move_up)
+        }
         !state.hasMatch -> stringResource(R.string.alignment_find_overlap)
-        state.aligned   -> stringResource(R.string.alignment_aligned)
-        else            -> stringResource(R.string.alignment_adjust_height)
+        else -> stringResource(R.string.alignment_adjust_height)
     }
     val guideColor = when {
+        state.guidance == com.panoramaapp.panorama.camera.AlignmentGuidance.READY -> Color.White.copy(alpha = 0.72f)
+        state.captureAllowed -> Color(0xFF78E08F)
         !state.hasMatch -> Color.White.copy(alpha = 0.72f)
-        state.aligned   -> Color(0xFF78E08F)
-        else            -> Color(0xFFFFC857)
+        else -> Color(0xFFFFC857)
+    }
+    var showMessage by remember { androidx.compose.runtime.mutableStateOf(true) }
+    LaunchedEffect(state.guidance) {
+        showMessage = true
+        if (state.guidance != com.panoramaapp.panorama.camera.AlignmentGuidance.READY &&
+            state.guidance != com.panoramaapp.panorama.camera.AlignmentGuidance.CAPTURE_READY
+        ) {
+            kotlinx.coroutines.delay(1_800)
+            showMessage = false
+        }
     }
     Column(
         modifier = modifier
@@ -257,12 +290,14 @@ private fun AlignmentGuideOverlay(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(
-            text = message,
-            color = guideColor,
-            style = MaterialTheme.typography.labelMedium,
-            textAlign = TextAlign.Center
-        )
+        if (showMessage) {
+            Text(
+                text = message,
+                color = guideColor,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center
+            )
+        }
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -270,26 +305,31 @@ private fun AlignmentGuideOverlay(
         ) {
             val leftX = 26.dp.toPx()
             val rightX = size.width - 26.dp.toPx()
-            val referenceY = size.height * state.referenceY.coerceIn(0.0, 1.0)
-            val currentY = size.height * state.currentY.coerceIn(0.0, 1.0)
-            drawLine(
-                color = guideColor.copy(alpha = 0.75f),
-                start = Offset(leftX, referenceY.toFloat()),
-                end = Offset(rightX, currentY.toFloat()),
-                strokeWidth = 2.dp.toPx()
-            )
+            val horizontal = state.axis == com.panoramaapp.panorama.camera.AlignmentAxis.HORIZONTAL
+            val referenceX = if (horizontal) size.width * state.referenceX.coerceIn(0.0, 1.0) else leftX
+            val currentX = if (horizontal) size.width * state.currentX.coerceIn(0.0, 1.0) else rightX
+            val referenceY = if (horizontal) size.height / 2f else size.height * state.referenceY.coerceIn(0.0, 1.0)
+            val currentY = if (horizontal) size.height / 2f else size.height * state.currentY.coerceIn(0.0, 1.0)
             drawCircle(
                 color = guideColor,
                 radius = 12.dp.toPx(),
-                center = Offset(leftX, referenceY.toFloat()),
+                center = Offset(referenceX.toFloat(), referenceY.toFloat()),
                 style = Stroke(width = 2.dp.toPx())
             )
-            drawCircle(
-                color = guideColor,
-                radius = 12.dp.toPx(),
-                center = Offset(rightX, currentY.toFloat()),
-                style = Stroke(width = 2.dp.toPx())
-            )
+            if (state.guidance != com.panoramaapp.panorama.camera.AlignmentGuidance.READY) {
+                drawLine(
+                    color = guideColor.copy(alpha = 0.75f),
+                    start = Offset(referenceX.toFloat(), referenceY.toFloat()),
+                    end = Offset(currentX.toFloat(), currentY.toFloat()),
+                    strokeWidth = 2.dp.toPx()
+                )
+                drawCircle(
+                    color = guideColor,
+                    radius = 12.dp.toPx(),
+                    center = Offset(currentX.toFloat(), currentY.toFloat()),
+                    style = Stroke(width = 2.dp.toPx())
+                )
+            }
         }
     }
 }
@@ -315,6 +355,7 @@ private fun PortraitCaptureControls(
     images: List<CapturedImage>,
     isCapturing: Boolean,
     cameraReady: Boolean,
+    canCapture: Boolean,
     onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
     onProcess: () -> Unit
@@ -341,6 +382,7 @@ private fun PortraitCaptureControls(
             images = images,
             isCapturing = isCapturing,
             cameraReady = cameraReady,
+            canCapture = canCapture,
             onCapturePhoto = onCapturePhoto,
             onRemoveLast = onRemoveLast,
             enabled = images.size >= 2 && !isCapturing,
@@ -355,6 +397,7 @@ private fun LandscapeSideRail(
     images: List<CapturedImage>,
     isCapturing: Boolean,
     cameraReady: Boolean,
+    canCapture: Boolean,
     onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
     onProcess: () -> Unit
@@ -396,7 +439,7 @@ private fun LandscapeSideRail(
                 icon = R.drawable.ic_btn_remove_trash
             )
             RailActionButton(
-                enabled = cameraReady && !isCapturing,
+                enabled = cameraReady && !isCapturing && canCapture,
                 onClick = onCapturePhoto,
                 icon = R.drawable.ic_btn_camera
             )
@@ -416,6 +459,7 @@ private fun CapturePrimaryActions(
     images: List<CapturedImage>,
     isCapturing: Boolean,
     cameraReady: Boolean,
+    canCapture: Boolean,
     onCapturePhoto: () -> Unit,
     onRemoveLast: () -> Unit,
     enabled: Boolean,
@@ -459,7 +503,7 @@ private fun CapturePrimaryActions(
 
         OutlinedButton(
             onClick = onCapturePhoto,
-            enabled = cameraReady && !isCapturing,
+            enabled = cameraReady && !isCapturing && canCapture,
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.size(50.dp)
         ) {
@@ -708,6 +752,8 @@ private object PreviewCameraController: CameraController {
 
     override fun setAlignmentReference(
         referenceFile: java.io.File,
+        orientation: CaptureOrientation,
+        expectedDirection: com.panoramaapp.panorama.camera.AlignmentDirection?,
         onUpdate: (AlignmentGuideState) -> Unit,
         onError: (Throwable) -> Unit
     ) = Unit
