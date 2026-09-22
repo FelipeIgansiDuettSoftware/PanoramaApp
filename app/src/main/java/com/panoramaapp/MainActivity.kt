@@ -1,17 +1,16 @@
 package com.panoramaapp
 
-import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelProvider
 import com.panoramaapp.panorama.PanoramaViewModel
 import com.panoramaapp.panorama.camera.CameraXController
@@ -25,26 +24,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-
-        window.statusBarColor = Color.WHITE
-        window.navigationBarColor = Color.WHITE
-
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
-        }
         panoramaViewModel = ViewModelProvider(this)[PanoramaViewModel::class.java]
         cameraController = CameraXController(this)
         setContent {
-            PanoramaAppTheme(darkTheme = false, ) {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            PanoramaAppTheme() {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    contentWindowInsets = WindowInsets.safeDrawing
+                ) { innerPadding ->
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding).fillMaxSize()
                     ) {
                         PanoramaApp(panoramaViewModel, cameraController)
                     }

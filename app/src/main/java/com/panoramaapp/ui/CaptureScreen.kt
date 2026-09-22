@@ -2,6 +2,7 @@ package com.panoramaapp.ui
 
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
+import androidx.annotation.DrawableRes
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -20,16 +21,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -39,13 +40,14 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -53,12 +55,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
 import com.panoramaapp.R
+import com.panoramaapp.panorama.camera.AlignmentGuideState
 import com.panoramaapp.panorama.camera.CameraController
 import com.panoramaapp.panorama.camera.CameraState
 import com.panoramaapp.panorama.camera.CapturedPhoto
-import com.panoramaapp.panorama.camera.AlignmentGuideState
-import com.panoramaapp.panorama.capture.CapturedImage
 import com.panoramaapp.panorama.capture.CaptureOrientation
+import com.panoramaapp.panorama.capture.CapturedImage
 
 @Composable
 fun CaptureScreen(
@@ -95,12 +97,11 @@ fun CaptureScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Black)
     ) {
         if (isLandscape) {
             LandscapeCaptureLayout(
                 images = images,
-                orientation = orientation,
                 isCapturing = isCapturing,
                 alignment = alignment,
                 cameraReady = cameraReady,
@@ -112,7 +113,6 @@ fun CaptureScreen(
         } else {
             PortraitCaptureLayout(
                 images = images,
-                orientation = orientation,
                 isCapturing = isCapturing,
                 alignment = alignment,
                 cameraReady = cameraReady,
@@ -128,7 +128,6 @@ fun CaptureScreen(
 @Composable
 private fun PortraitCaptureLayout(
     images: List<CapturedImage>,
-    orientation: CaptureOrientation,
     isCapturing: Boolean,
     alignment: AlignmentGuideState,
     cameraReady: Boolean,
@@ -137,47 +136,35 @@ private fun PortraitCaptureLayout(
     onRemoveLast: () -> Unit,
     onProcess: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        cameraContent(
-            Modifier
-                .fillMaxSize()
-                .padding(8.dp)
-        )
-        CaptureStatusOverlay(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(20.dp)
-                .fillMaxWidth(0.72f),
-            isCapturing = isCapturing
-        )
-        CounterOverlay(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(20.dp),
-            count = images.size
-        )
-        AlignmentGuideOverlay(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 156.dp),
-            state = alignment
-        )
-        PortraitCaptureControls(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            images = images,
-            isCapturing = isCapturing,
-            cameraReady = cameraReady,
-            onCapturePhoto = onCapturePhoto,
-            onRemoveLast = onRemoveLast,
-            onProcess = onProcess
-        )
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Box(Modifier) {
+            cameraContent(
+                Modifier.fillMaxSize()
+            )
+            AlignmentGuideOverlay(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 156.dp),
+                state = alignment
+            )
+            PortraitCaptureControls(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                images = images,
+                isCapturing = isCapturing,
+                cameraReady = cameraReady,
+                onCapturePhoto = onCapturePhoto,
+                onRemoveLast = onRemoveLast,
+                onProcess = onProcess
+            )
+        }
     }
 }
 
 @Composable
 private fun LandscapeCaptureLayout(
     images: List<CapturedImage>,
-    orientation: CaptureOrientation,
     isCapturing: Boolean,
     alignment: AlignmentGuideState,
     cameraReady: Boolean,
@@ -186,42 +173,32 @@ private fun LandscapeCaptureLayout(
     onRemoveLast: () -> Unit,
     onProcess: () -> Unit
 ) {
-    Row(modifier = Modifier.fillMaxSize().padding(10.dp)) {
+    Row(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
         ) {
             cameraContent(
-                Modifier
-                    .fillMaxSize()
-            )
-            CaptureStatusOverlay(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth(0.68f),
-                isCapturing = isCapturing
+                Modifier.fillMaxSize()
             )
             AlignmentGuideOverlay(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter),
+                modifier = Modifier.align(Alignment.BottomCenter),
                 state = alignment
             )
+            LandscapeSideRail(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .wrapContentSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                images = images,
+                isCapturing = isCapturing,
+                cameraReady = cameraReady,
+                onCapturePhoto = onCapturePhoto,
+                onRemoveLast = onRemoveLast,
+                onProcess = onProcess
+            )
         }
-        Spacer(Modifier.width(5.dp))
-        LandscapeSideRail(
-            modifier = Modifier
-                .width(132.dp)
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black),
-            images = images,
-            isCapturing = isCapturing,
-            cameraReady = cameraReady,
-            onCapturePhoto = onCapturePhoto,
-            onRemoveLast = onRemoveLast,
-            onProcess = onProcess
-        )
     }
 }
 
@@ -237,9 +214,7 @@ private fun CameraViewport(
     onRequestPermission: () -> Unit
 ) {
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.Black),
+        modifier = modifier.background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
         if ((cameraState == CameraState.Starting && hasCameraPermission) || cameraState == CameraState.Ready) {
@@ -255,33 +230,6 @@ private fun CameraViewport(
                 onRequestPermission = onRequestPermission
             )
         }
-    }
-}
-
-@Composable
-private fun CaptureStatusOverlay(
-    modifier: Modifier,
-    isCapturing: Boolean
-) {
-    Column(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.58f), RoundedCornerShape(16.dp))
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Text(
-            text = stringResource(
-                if (isCapturing) R.string.capture_saving_hint
-                else R.string.capture_ready_hint
-            ),
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge
-        )
-        Text(
-            text = stringResource(R.string.capture_overlap_hint),
-            color = Color.White.copy(alpha = 0.82f),
-            style = MaterialTheme.typography.labelSmall
-        )
     }
 }
 
@@ -374,7 +322,7 @@ private fun PortraitCaptureControls(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.72f))
+            .background(Color.Black.copy(alpha = 0.5f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -394,9 +342,7 @@ private fun PortraitCaptureControls(
             isCapturing = isCapturing,
             cameraReady = cameraReady,
             onCapturePhoto = onCapturePhoto,
-            onRemoveLast = onRemoveLast
-        )
-        ProcessingActions(
+            onRemoveLast = onRemoveLast,
             enabled = images.size >= 2 && !isCapturing,
             onProcess = onProcess
         )
@@ -413,42 +359,56 @@ private fun LandscapeSideRail(
     onRemoveLast: () -> Unit,
     onProcess: () -> Unit
 ) {
-    Column(modifier = modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
-        CounterOverlay(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            count = images.size
-        )
-        if (images.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                items(images, key = { it.sequence }) { image -> Thumbnail(image) }
+    Row(
+        modifier = modifier.padding(
+            horizontal = 8.dp,
+            vertical = 10.dp
+        ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Column{
+            CounterOverlay(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                count = images.size
+            )
+            if (images.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    items(images, key = { it.sequence }) { image -> Thumbnail(image) }
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
             }
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
         }
-        RailActionButton(
-            text = stringResource(R.string.capture_remove_last),
-            enabled = images.isNotEmpty() && !isCapturing,
-            onClick = onRemoveLast
-        )
-        RailActionButton(
-            text = stringResource(R.string.capture_button),
-            enabled = cameraReady && !isCapturing,
-            onClick = onCapturePhoto,
-            primary = true
-        )
-        RailActionButton(
-            text = stringResource(R.string.process_panorama),
-            enabled = images.size >= 2 && !isCapturing,
-            onClick = onProcess
-        )
+
+
+
+        Column {
+            RailActionButton(
+                enabled = images.isNotEmpty() && !isCapturing,
+                onClick = onRemoveLast,
+                icon = R.drawable.ic_btn_remove_trash
+            )
+            RailActionButton(
+                enabled = cameraReady && !isCapturing,
+                onClick = onCapturePhoto,
+                icon = R.drawable.ic_btn_camera
+            )
+            RailActionButton(
+                enabled = images.size >= 2 && !isCapturing,
+                onClick = onProcess,
+                icon = R.drawable.ic_btn_panorama
+            )
+        }
+
     }
+
 }
 
 @Composable
@@ -457,90 +417,81 @@ private fun CapturePrimaryActions(
     isCapturing: Boolean,
     cameraReady: Boolean,
     onCapturePhoto: () -> Unit,
-    onRemoveLast: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedButton(
-            onClick = onRemoveLast,
-            enabled = images.isNotEmpty() && !isCapturing,
-            modifier = Modifier.weight(0.9f),
-            contentPadding = PaddingValues(horizontal = 8.dp)
-        ) {
-            Text(text = stringResource(R.string.capture_remove_last), maxLines = 1)
-        }
-        Button(
-            onClick = onCapturePhoto,
-            enabled = cameraReady && !isCapturing,
-            modifier = Modifier.weight(1.1f)
-        ) {
-            Text(
-                text = stringResource(R.string.capture_button),
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProcessingActions(
+    onRemoveLast: () -> Unit,
     enabled: Boolean,
     onProcess: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        FilledTonalButton(
+        OutlinedButton(
+            onClick = onRemoveLast,
+            enabled = images.isNotEmpty() && !isCapturing,
+            modifier = Modifier.size(50.dp),
+            contentPadding = PaddingValues(0.dp),
+            border = BorderStroke(1.dp, Color.Gray)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_btn_remove_trash),
+                contentDescription = null,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+
+        Spacer(Modifier.width(8.dp))
+        OutlinedButton(
             onClick = onProcess,
             enabled = enabled,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 8.dp)
-        ) { Text(text = stringResource(R.string.process_panorama), maxLines = 1) }
+            modifier = Modifier.size(50.dp),
+            contentPadding = PaddingValues(0.dp),
+            border = BorderStroke(1.dp, Color.Gray)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_btn_panorama),
+                contentDescription = null,
+                modifier = Modifier.size(30.dp),
+                tint = Color.Gray
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+
+        OutlinedButton(
+            onClick = onCapturePhoto,
+            enabled = cameraReady && !isCapturing,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(50.dp)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_btn_camera),
+                contentDescription = null,
+                modifier = Modifier.size(30.dp),
+                tint = Color.White
+            )
+        }
     }
 }
 
 @Composable
 private fun RailActionButton(
-    text: String,
+    @DrawableRes
+    icon: Int,
     enabled: Boolean,
-    onClick: () -> Unit,
-    primary: Boolean = false
+    onClick: () -> Unit
 ) {
-    val buttonModifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 2.dp)
-    if (primary) {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = buttonModifier,
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = text,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall
-            )
-        }
-    } else {
-        OutlinedButton (
-            onClick = onClick,
-            enabled = enabled,
-            modifier = buttonModifier,
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-            border = BorderStroke(width = 1.dp, color = Color.Gray)
-        ) {
-            Text(
-                text = text,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White
-            )
-        }
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(50.dp),
+        contentPadding = PaddingValues(0.dp),
+        border = BorderStroke(1.dp, Color.Gray)
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = null,
+            modifier = Modifier.size(30.dp)
+        )
     }
 }
 
