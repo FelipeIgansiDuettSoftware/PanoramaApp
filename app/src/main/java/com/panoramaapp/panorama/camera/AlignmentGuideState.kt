@@ -24,7 +24,7 @@ data class AlignmentGuideState(
     val currentX: Double = 0.5,
     val matchCount: Int = 0,
     val hysteresisAligned: Boolean? = null,
-    val axis: AlignmentAxis = AlignmentAxis.VERTICAL,
+    val axis: AlignmentAxis = AlignmentAxis.HORIZONTAL,
     val axisLocked: Boolean = false,
     val direction: AlignmentDirection? = null,
     val progress: Double = 0.0,

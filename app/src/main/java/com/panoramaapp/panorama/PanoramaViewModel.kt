@@ -131,7 +131,9 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
                 cameraController.setAlignmentReference(
                     referenceFile = remaining.file,
                     orientation = currentCaptureOrientation(),
-                    expectedAxis = motionAxis,
+                    // Panorama capture is lateral in both device orientations. Keep the
+                    // analysis and overlay on the horizontal image axis in portrait too.
+                    expectedAxis = motionAxis ?: AlignmentAxis.HORIZONTAL,
                     expectedDirection = motionDirection,
                     onUpdate = { update ->
                         viewModelScope.launch(Dispatchers.Main) {
@@ -240,7 +242,9 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
             cameraController.setAlignmentReference(
                 referenceFile = frame.file,
                 orientation = currentCaptureOrientation(),
-                expectedAxis = motionAxis,
+                // Panorama capture is lateral in both device orientations. Keep the
+                // analysis and overlay on the horizontal image axis in portrait too.
+                expectedAxis = motionAxis ?: AlignmentAxis.HORIZONTAL,
                 expectedDirection = motionDirection,
                 onUpdate = { update ->
                     viewModelScope.launch(Dispatchers.Main) {

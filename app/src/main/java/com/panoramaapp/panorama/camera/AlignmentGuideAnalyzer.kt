@@ -392,7 +392,9 @@ class AlignmentGuideAnalyzer(
         const val TARGET_PROGRESS_MIN = 0.18
         const val MIN_OVERLAP_RATIO = 0.38
         const val LANDSCAPE_MAX_CROSS_AXIS_DELTA = 0.16
-        const val PORTRAIT_MAX_CROSS_AXIS_DELTA = 0.22
+        // Portrait is typically held with one hand, so allow more vertical drift while
+        // preserving the same horizontal sweep axis used by landscape capture.
+        const val PORTRAIT_MAX_CROSS_AXIS_DELTA = 0.28
         const val AXIS_CONFIRMATION_FRAMES = 3
         const val SMOOTHING_ALPHA = 0.28
         const val MIN_VISIBLE_PROGRESS = 0.006
