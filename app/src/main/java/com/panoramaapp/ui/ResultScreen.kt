@@ -1,5 +1,6 @@
 package com.panoramaapp.ui
 
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -9,23 +10,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,10 +34,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,6 +56,7 @@ fun ResultScreen(
     onNewSession: () -> Unit,
     previewBitmap: Bitmap? = null,
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val loadedBitmap by produceState<Bitmap?>(
         initialValue = null,
         key1 = result.outputPath,
@@ -65,7 +67,7 @@ fun ResultScreen(
         }
     }
 
-    if (result.orientation == CaptureOrientation.LANDSCAPE) {
+    if (isLandscape) {
         LandscapeResultScreen(
             result = result,
             bitmap = loadedBitmap,
@@ -90,20 +92,19 @@ private fun PortraitResultScreen(
     onNewSession: () -> Unit,
 ) {
     val imageScrollState = rememberScrollState()
-    val actionScrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp, horizontal = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ResultBackButton(onClick = onBackToSession)
-            ResultHeader(result = result)
+            ResultHeader(result = result, modifier = Modifier.weight(1f))
             ResultNewSessionButton(onClick = onNewSession)
         }
 
@@ -116,14 +117,16 @@ private fun PortraitResultScreen(
                 CircularProgressIndicator()
             } else {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val imageWidth = maxWidth
-                    val imageHeight = imageWidth * bitmap.height.toFloat() / bitmap.width.toFloat()
+                    // A lateral panorama uses the available portrait height as its scale
+                    // reference and overflows horizontally when its full width does not fit.
+                    val imageHeight = maxHeight
+                    val imageWidth = imageHeight * bitmap.width.toFloat() / bitmap.height.toFloat()
 
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(imageScrollState),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                            .horizontalScroll(imageScrollState),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Image(
                             bitmap = bitmap.asImageBitmap(),
@@ -161,7 +164,9 @@ private fun LandscapeResultScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp, horizontal = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -205,7 +210,7 @@ private fun LandscapeResultScreen(
 }
 
 @Composable
-private fun ResultHeader(result: StitchingResult) {
+private fun ResultHeader(result: StitchingResult, modifier: Modifier = Modifier) {
     Text(
         text = stringResource(
             R.string.result_summary,
@@ -217,7 +222,8 @@ private fun ResultHeader(result: StitchingResult) {
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         overflow = TextOverflow.Ellipsis,
-        maxLines = 2
+        maxLines = 2,
+        modifier = modifier
     )
 }
 
@@ -236,13 +242,14 @@ private fun ResultImageSurface(
 
 @Composable
 private fun ResultBackButton(onClick: () -> Unit) {
-    Button(
+    IconButton(
         onClick = onClick,
         modifier = Modifier.wrapContentWidth(),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues(0.dp)
     ) {
-        Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.Black)
+        Icon(
+            Icons.Default.ArrowBack, contentDescription = null,
+            tint = Color.White
+        )
     }
 }
 
@@ -250,7 +257,9 @@ private fun ResultBackButton(onClick: () -> Unit) {
 private fun ResultNewSessionButton(onClick: () -> Unit) {
     FloatingActionButton(
         onClick = onClick,
-        containerColor = Color(red = 0, green = 0, blue = 0, alpha = 100)
+        containerColor = Color(red = 30, green = 145, blue = 246, alpha = 255),
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(8.dp)
     ) {
         Icon(Icons.Default.Add, contentDescription = null)
     }
@@ -277,7 +286,7 @@ private fun decodeResultBitmap(path: String): Bitmap? {
     )
 }
 
-@Preview(showBackground = true, widthDp = 400, heightDp = 800)
+@Preview(showBackground = true, widthDp = 400, heightDp = 800, backgroundColor = 0xFF000000)
 @Composable
 private fun PortraitResultScreenPreview() {
     PanoramaAppTheme {
@@ -290,7 +299,7 @@ private fun PortraitResultScreenPreview() {
     }
 }
 
-@Preview(showBackground = true, widthDp = 800, heightDp = 400)
+@Preview(showBackground = true, widthDp = 800, heightDp = 400, backgroundColor = 0xFF000000)
 @Composable
 private fun LandscapeResultScreenPreview() {
     PanoramaAppTheme {
