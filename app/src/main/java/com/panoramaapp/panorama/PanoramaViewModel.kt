@@ -10,6 +10,7 @@ import com.panoramaapp.panorama.camera.CameraState
 import com.panoramaapp.panorama.camera.CapturedPhoto
 import com.panoramaapp.panorama.camera.AlignmentGuideState
 import com.panoramaapp.panorama.camera.AlignmentDirection
+import com.panoramaapp.panorama.camera.AlignmentAxis
 import com.panoramaapp.panorama.camera.AlignmentGuidance
 import com.panoramaapp.panorama.capture.CaptureSession
 import com.panoramaapp.panorama.capture.CaptureOrientation
@@ -45,6 +46,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
     @Volatile
     private var capturing = false
     private var alignmentGuide = AlignmentGuideState()
+    private var motionAxis: AlignmentAxis? = null
     private var motionDirection: AlignmentDirection? = null
     private var capturePhase = CapturePhase.WAITING_FOR_FIRST_PHOTO
 
@@ -119,6 +121,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
             val remaining = synchronized(sessionLock) { session.images.lastOrNull() }
             if (remaining == null) {
                 cameraController.clearAlignmentReference()
+                motionAxis = null
                 motionDirection = null
                 alignmentGuide = AlignmentGuideState()
                 capturePhase = CapturePhase.WAITING_FOR_FIRST_PHOTO
@@ -128,9 +131,11 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
                 cameraController.setAlignmentReference(
                     referenceFile = remaining.file,
                     orientation = currentCaptureOrientation(),
+                    expectedAxis = motionAxis,
                     expectedDirection = motionDirection,
                     onUpdate = { update ->
                         viewModelScope.launch(Dispatchers.Main) {
+                            if (motionAxis == null && update.axisLocked) motionAxis = update.axis
                             if (motionDirection == null && update.direction != null) motionDirection = update.direction
                             alignmentGuide = update
                             if (_uiState.value is PanoramaUiState.Capturing) publishCaptureState()
@@ -191,6 +196,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
     fun startNewSession(cameraController: CameraController) {
         cameraController.clearAlignmentReference()
         alignmentGuide = AlignmentGuideState()
+        motionAxis = null
         motionDirection = null
         capturePhase = CapturePhase.WAITING_FOR_FIRST_PHOTO
         val replacement = synchronized(sessionLock) {
@@ -234,9 +240,11 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
             cameraController.setAlignmentReference(
                 referenceFile = frame.file,
                 orientation = currentCaptureOrientation(),
+                expectedAxis = motionAxis,
                 expectedDirection = motionDirection,
                 onUpdate = { update ->
                     viewModelScope.launch(Dispatchers.Main) {
+                        if (motionAxis == null && update.axisLocked) motionAxis = update.axis
                         if (motionDirection == null && update.direction != null) {
                             motionDirection = update.direction
                         }

@@ -31,6 +31,7 @@ interface CameraController {
     fun setAlignmentReference(
         referenceFile: File,
         orientation: com.panoramaapp.panorama.capture.CaptureOrientation,
+        expectedAxis: AlignmentAxis?,
         expectedDirection: AlignmentDirection?,
         onUpdate: (AlignmentGuideState) -> Unit,
         onError: (Throwable) -> Unit

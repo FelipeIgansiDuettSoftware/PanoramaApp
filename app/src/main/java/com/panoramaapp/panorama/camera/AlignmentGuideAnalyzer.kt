@@ -3,7 +3,6 @@ package com.panoramaapp.panorama.camera
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.exifinterface.media.ExifInterface
-import com.google.common.math.Quantiles.median
 import com.panoramaapp.panorama.capture.CaptureOrientation
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -24,6 +23,7 @@ import kotlin.math.sqrt
 class AlignmentGuideAnalyzer(
     private val referenceFile: File,
     private val orientation: CaptureOrientation,
+    expectedAxis: AlignmentAxis?,
     expectedDirection: AlignmentDirection?,
     private val onUpdate: (AlignmentGuideState) -> Unit
 ) : ImageAnalysis.Analyzer {
@@ -33,12 +33,16 @@ class AlignmentGuideAnalyzer(
     private val referenceDescriptors = Mat()
     private val detector = ORB.create(1_200)
     private val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
-    private val preferredAxis = if (orientation == CaptureOrientation.LANDSCAPE) AlignmentAxis.HORIZONTAL else AlignmentAxis.VERTICAL
-    private var axis: AlignmentAxis? = null
+    private val preferredAxis = AlignmentAxis.HORIZONTAL
+    private var axis: AlignmentAxis? = expectedAxis
+    private var candidateAxis: AlignmentAxis? = null
+    private var consecutiveAxisFrames = 0
     @Volatile private var closed = false
     private var direction: AlignmentDirection? = expectedDirection
     private var referencePrepared = false
     private var referenceOriented = false
+    private var smoothedHorizontalDelta: Double? = null
+    private var smoothedVerticalDelta: Double? = null
     private var lastEmittedState: AlignmentGuideState? = null
     private var lastEmissionNanos = 0L
 
@@ -121,22 +125,47 @@ class AlignmentGuideAnalyzer(
                         publishNoMatch(goodMatches.size)
                         return
                     }
-                    val horizontalDelta = median(displacements.map { it.first })
-                    val verticalDelta = median(displacements.map { it.second })
-                    val chosenAxis = axis ?: when {
+                    val horizontalDelta = smooth(
+                        median(displacements.map { it.first }),
+                        smoothedHorizontalDelta
+                    ) { smoothedHorizontalDelta = it }
+                    val verticalDelta = smooth(
+                        median(displacements.map { it.second }),
+                        smoothedVerticalDelta
+                    ) { smoothedVerticalDelta = it }
+                    val dominantAxis = when {
                         abs(horizontalDelta) > abs(verticalDelta) * AXIS_DOMINANCE_RATIO -> AlignmentAxis.HORIZONTAL
                         abs(verticalDelta) > abs(horizontalDelta) * AXIS_DOMINANCE_RATIO -> AlignmentAxis.VERTICAL
-                        else -> preferredAxis
+                        else -> null
                     }
-                    if (axis == null && maxOf(abs(horizontalDelta), abs(verticalDelta)) >= MIN_PROGRESS) axis = chosenAxis
+                    if (axis == null) {
+                        if (dominantAxis != null && maxOf(abs(horizontalDelta), abs(verticalDelta)) >= MIN_PROGRESS) {
+                            if (candidateAxis == dominantAxis) {
+                                consecutiveAxisFrames++
+                            } else {
+                                candidateAxis = dominantAxis
+                                consecutiveAxisFrames = 1
+                            }
+                            if (consecutiveAxisFrames >= AXIS_CONFIRMATION_FRAMES) axis = dominantAxis
+                        } else {
+                            candidateAxis = null
+                            consecutiveAxisFrames = 0
+                        }
+                    }
+                    val chosenAxis = axis ?: candidateAxis ?: preferredAxis
                     val mainDelta = if (chosenAxis == AlignmentAxis.HORIZONTAL) horizontalDelta else verticalDelta
                     val crossDelta = if (chosenAxis == AlignmentAxis.HORIZONTAL) verticalDelta else horizontalDelta
                     val smoothedReferenceX = 0.5
                     val smoothedCurrentX = (0.5 + horizontalDelta).coerceIn(0.0, 1.0)
                     val smoothedReferenceY = 0.5
                     val smoothedCurrentY = (0.5 + verticalDelta).coerceIn(0.0, 1.0)
-                    val detectedDirection = direction ?: directionFor(mainDelta)
-                    val validAxis = abs(crossDelta) <= MAX_CROSS_AXIS_DELTA
+                    val detectedDirection = direction ?: if (axis != null) directionFor(mainDelta) else null
+                    val maxCrossAxisDelta = if (orientation == CaptureOrientation.PORTRAIT) {
+                        PORTRAIT_MAX_CROSS_AXIS_DELTA
+                    } else {
+                        LANDSCAPE_MAX_CROSS_AXIS_DELTA
+                    }
+                    val validAxis = abs(crossDelta) <= maxCrossAxisDelta
                     val validDirection = direction == null || detectedDirection == direction
                     val progress = abs(mainDelta)
                     val overlap = (1.0 - progress).coerceIn(0.0, 1.0)
@@ -147,6 +176,7 @@ class AlignmentGuideAnalyzer(
                         !validAxis -> AlignmentGuidance.OUT_OF_AXIS
                         !validDirection -> AlignmentGuidance.KEEP_DIRECTION
                         overlap < MIN_OVERLAP_RATIO -> AlignmentGuidance.INSUFFICIENT_OVERLAP
+                        axis == null -> AlignmentGuidance.FIND_OVERLAP
                         direction == null && progress < MIN_PROGRESS -> AlignmentGuidance.FIND_OVERLAP
                         detectedDirection == AlignmentDirection.POSITIVE -> AlignmentGuidance.MOVE_POSITIVE
                         else -> AlignmentGuidance.MOVE_NEGATIVE
@@ -161,7 +191,8 @@ class AlignmentGuideAnalyzer(
                             currentX = smoothedCurrentX,
                             matchCount = goodMatches.size,
                             hysteresisAligned = captureAllowed,
-                        axis = chosenAxis,
+                            axis = chosenAxis,
+                            axisLocked = axis != null,
                             direction = direction ?: detectedDirection,
                             progress = progress,
                             overlapRatio = overlap,
@@ -171,7 +202,9 @@ class AlignmentGuideAnalyzer(
                             guidance = guidance
                         )
                     )
-                    if (direction == null && detectedDirection != null && progress >= MIN_PROGRESS) direction = detectedDirection
+                    if (direction == null && axis != null && detectedDirection != null && progress >= MIN_PROGRESS) {
+                        direction = detectedDirection
+                    }
                 } finally {
                     transform.release()
                     inlierMask.release()
@@ -244,7 +277,7 @@ class AlignmentGuideAnalyzer(
     }
 
     private fun publishNoMatch(matchCount: Int = 0) {
-        emit(AlignmentGuideState(active = true, hasMatch = false, axis = axis ?: preferredAxis, direction = direction, matchCount = matchCount, guidance = AlignmentGuidance.FIND_OVERLAP))
+        emit(AlignmentGuideState(active = true, hasMatch = false, axis = axis ?: candidateAxis ?: preferredAxis, axisLocked = axis != null, direction = direction, matchCount = matchCount, guidance = AlignmentGuidance.FIND_OVERLAP))
     }
 
     private fun directionFor(delta: Double): AlignmentDirection? = when {
@@ -358,8 +391,10 @@ class AlignmentGuideAnalyzer(
         const val AXIS_DOMINANCE_RATIO = 1.25
         const val TARGET_PROGRESS_MIN = 0.18
         const val MIN_OVERLAP_RATIO = 0.38
-        const val MAX_CROSS_AXIS_DELTA = 0.16
-        const val SMOOTHING_ALPHA = 0.16
+        const val LANDSCAPE_MAX_CROSS_AXIS_DELTA = 0.16
+        const val PORTRAIT_MAX_CROSS_AXIS_DELTA = 0.22
+        const val AXIS_CONFIRMATION_FRAMES = 3
+        const val SMOOTHING_ALPHA = 0.28
         const val MIN_VISIBLE_PROGRESS = 0.006
         const val MIN_UPDATE_INTERVAL_NANOS = 100_000_000L
     }

@@ -2,6 +2,7 @@ package com.panoramaapp.ui
 
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import androidx.annotation.DrawableRes
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
@@ -57,6 +58,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
+import androidx.exifinterface.media.ExifInterface
 import com.panoramaapp.R
 import com.panoramaapp.panorama.camera.AlignmentGuideState
 import com.panoramaapp.panorama.camera.CameraController
@@ -607,10 +609,37 @@ private fun Thumbnail(image: CapturedImage) {
                             inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
                         }
                         .let { options ->
-                            BitmapFactory.decodeFile(
+                            val decoded = BitmapFactory.decodeFile(
                                 image.file.absolutePath,
                                 options
                             )
+                            if (decoded == null) {
+                                null
+                            } else {
+                                val exifOrientation = ExifInterface(image.file.absolutePath).getAttributeInt(
+                                    ExifInterface.TAG_ORIENTATION,
+                                    ExifInterface.ORIENTATION_NORMAL
+                                )
+                                val rotation = when (exifOrientation) {
+                                    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                                    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                                    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                                    else -> 0f
+                                }
+                                if (rotation == 0f) decoded else {
+                                    val rotated = android.graphics.Bitmap.createBitmap(
+                                        decoded,
+                                        0,
+                                        0,
+                                        decoded.width,
+                                        decoded.height,
+                                        Matrix().apply { postRotate(rotation) },
+                                        true
+                                    )
+                                    if (rotated !== decoded) decoded.recycle()
+                                    rotated
+                                }
+                            }
                         }
                 }
         }
@@ -753,6 +782,7 @@ private object PreviewCameraController: CameraController {
     override fun setAlignmentReference(
         referenceFile: java.io.File,
         orientation: CaptureOrientation,
+        expectedAxis: com.panoramaapp.panorama.camera.AlignmentAxis?,
         expectedDirection: com.panoramaapp.panorama.camera.AlignmentDirection?,
         onUpdate: (AlignmentGuideState) -> Unit,
         onError: (Throwable) -> Unit

@@ -155,6 +155,7 @@ class CameraXController(context: Context) : CameraController {
     override fun setAlignmentReference(
         referenceFile: File,
         orientation: CaptureOrientation,
+        expectedAxis: AlignmentAxis?,
         expectedDirection: AlignmentDirection?,
         onUpdate: (AlignmentGuideState) -> Unit,
         onError: (Throwable) -> Unit
@@ -170,7 +171,7 @@ class CameraXController(context: Context) : CameraController {
         }
         clearAlignmentReference()
         runCatching {
-            AlignmentGuideAnalyzer(referenceFile, orientation, expectedDirection, onUpdate).also { analyzer ->
+            AlignmentGuideAnalyzer(referenceFile, orientation, expectedAxis, expectedDirection, onUpdate).also { analyzer ->
                 alignmentAnalyzer = analyzer
                 analysis.setAnalyzer(analysisExecutor, analyzer)
             }
