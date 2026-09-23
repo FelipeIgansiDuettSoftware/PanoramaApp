@@ -1,19 +1,21 @@
 package com.panoramaapp.panorama.capture
 
 import android.content.Context
+import com.panoramaapp.R
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 class CaptureSessionStore(context: Context) {
     private val rootDirectory = File(context.cacheDir, "panorama-sessions")
+    private val resources = context.resources
 
     fun createSession(): CaptureSession {
         val id = "session-${SESSION_ID_FORMAT.format(System.currentTimeMillis())}-${UUID.randomUUID().toString().take(8)}"
         val directory = File(rootDirectory, id)
         val inputDirectory = File(directory, "input")
         check(inputDirectory.mkdirs() || inputDirectory.isDirectory) {
-            "Unable to create session directory"
+            resources.getString(R.string.error_session_directory)
         }
         return CaptureSession(id = id, directory = directory).also(::writeMetadata)
     }
@@ -27,7 +29,7 @@ class CaptureSessionStore(context: Context) {
         height: Int,
         capturedAtNanos: Long = 0L
     ): CaptureSession {
-        require(file.isFile && file.length() > 0) { "Captured image is empty" }
+        require(file.isFile && file.length() > 0) { resources.getString(R.string.error_empty_image) }
         val image = CapturedImage(
             sequence = sequence,
             file = file,
@@ -50,13 +52,13 @@ class CaptureSessionStore(context: Context) {
 
     fun deleteSession(session: CaptureSession) {
         check(!session.directory.exists() || session.directory.deleteRecursively()) {
-            "Unable to discard capture session"
+            resources.getString(R.string.error_discard_session)
         }
     }
 
     fun removeLast(session: CaptureSession): CaptureSession {
         val last = session.images.lastOrNull() ?: return session
-        check(!last.file.exists() || last.file.delete()) { "Unable to remove captured image" }
+        check(!last.file.exists() || last.file.delete()) { resources.getString(R.string.error_remove_image) }
         return session.copy(images = session.images.dropLast(1)).also(::writeMetadata)
     }
 

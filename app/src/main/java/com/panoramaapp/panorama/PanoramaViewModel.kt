@@ -72,7 +72,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun onCameraError(error: Throwable) {
-        _cameraState.value = CameraState.Error(error.message ?: "Camera unavailable")
+        _cameraState.value = CameraState.Error(error.message ?: appContext.getString(R.string.error_camera_unavailable_generic))
         showCaptureState()
     }
 
@@ -116,7 +116,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
         }
         result.onFailure {
             capturePhase = CapturePhase.ERROR
-            _uiState.value = PanoramaUiState.Error(it.message ?: "Unable to remove frame")
+            _uiState.value = PanoramaUiState.Error(it.message ?: appContext.getString(R.string.error_remove_image))
         }.onSuccess {
             val remaining = synchronized(sessionLock) { session.images.lastOrNull() }
             if (remaining == null) {
@@ -179,7 +179,7 @@ class PanoramaViewModel(application: Application) : AndroidViewModel(application
                     capturePhase = CapturePhase.ERROR
                     Log.e(TAG, "Panorama processing failed: session=${session.id}", error)
                     _uiState.value = PanoramaUiState.Error(
-                        error.message ?: "Panorama processing failed"
+                        error.message ?: appContext.getString(R.string.error_processing_failed)
                     )
                 }
         }

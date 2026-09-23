@@ -6,6 +6,7 @@ import com.panoramaapp.panorama.capture.CaptureOrientation
 import com.panoramaapp.panorama.processing.ImageNormalizer
 import com.panoramaapp.panorama.processing.PanoramaProcessor
 import com.panoramaapp.panorama.processing.StitchingResult
+import com.panoramaapp.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.opencv.android.OpenCVLoader
@@ -15,7 +16,6 @@ import org.opencv.core.DMatch
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
-import org.opencv.core.MatOfPoint
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import org.opencv.core.Rect
@@ -47,8 +47,9 @@ import kotlin.math.sqrt
 class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
     private companion object {
         const val REGISTRATION_MAX_DIMENSION = 960
-        const val COMPOSITION_MAX_DIMENSION = 1_920
+        const val COMPOSITION_TARGET_HEIGHT = 1_920
         const val MAX_CANVAS_DIMENSION = 12_000
+        const val MAX_ESTIMATED_COORDINATE = MAX_CANVAS_DIMENSION * 4
         const val MAX_CANVAS_PIXELS = 16_000_000L
         const val MAX_LOOKAHEAD = 6
         const val MAX_FEATURES = 2_500
@@ -64,15 +65,16 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
     }
 
     private val cacheDirectory = File(context.cacheDir, "panorama-processing")
+    private val resources = context.resources
 
     override suspend fun stitch(
         images: List<CapturedImage>,
         orientation: CaptureOrientation
     ): StitchingResult = withContext(Dispatchers.Default) {
-        require(images.size >= 2) { "At least two images are required" }
-        check(OpenCVLoader.initLocal()) { "OpenCV could not be initialized" }
+        require(images.size >= 2) { resources.getString(R.string.error_minimum_images) }
+        check(OpenCVLoader.initLocal()) { resources.getString(R.string.error_opencv_init) }
         check(cacheDirectory.mkdirs() || cacheDirectory.isDirectory) {
-            "Unable to create processing directory"
+            resources.getString(R.string.error_processing_directory)
         }
 
         val orderedImages = images.sortedWith(
@@ -81,13 +83,13 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         val sessionDirectory = orderedImages.first().file.parentFile?.parentFile ?: cacheDirectory
         val output = File(sessionDirectory, "result-panorama.jpg")
         val workDirectory = File(cacheDirectory, "work-${System.nanoTime()}")
-            .also { check(it.mkdirs()) { "Unable to create work directory" } }
+            .also { check(it.mkdirs()) { resources.getString(R.string.error_work_directory) } }
         val startedAt = System.currentTimeMillis()
 
         try {
             val selection = selectSequentialFrames(orderedImages, workDirectory)
             check(selection.images.size >= 2) {
-                "Movement produced fewer than two coherent frames; keep moving slowly with visible overlap"
+                resources.getString(R.string.error_coherent_frames)
             }
 
             val globalTransforms = composeGlobalTransforms(selection.relativeTransforms)
@@ -116,12 +118,35 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
                     averageReprojectionError = averageError,
                     coverageRatio = composition.coverageRatio,
                     diagnostics = listOf(
-                        "PANORAMA: sequential ${selection.images.size}/${orderedImages.size} frames",
-                        "Registration detectors: ${selection.registrations.groupingBy { it.detector }.eachCount()}",
-                        "Average inliers: ${(averageInlierRatio * 100.0).roundToInt()}%",
-                        "Average reprojection error: ${"%.2f".format(averageError)} px",
-                        "Orientation: ${orientation.name.lowercase()}; crop coverage: ${(composition.coverageRatio * 100.0).roundToInt()}%",
-                        "Distance-weighted fade applied at every overlap"
+                        resources.getString(
+                            R.string.diagnostic_sequence,
+                            selection.images.size,
+                            orderedImages.size
+                        ),
+                        resources.getString(
+                            R.string.diagnostic_detectors,
+                            selection.registrations.groupingBy { it.detector }.eachCount()
+                        ),
+                        resources.getString(
+                            R.string.diagnostic_inliers,
+                            (averageInlierRatio * 100.0).roundToInt()
+                        ),
+                        resources.getString(
+                            R.string.diagnostic_reprojection,
+                            "%.2f".format(averageError)
+                        ),
+                        resources.getString(
+                            R.string.diagnostic_orientation,
+                            resources.getString(
+                                if (orientation == CaptureOrientation.PORTRAIT) {
+                                    R.string.orientation_portrait
+                                } else {
+                                    R.string.orientation_landscape
+                                }
+                            ),
+                            (composition.coverageRatio * 100.0).roundToInt()
+                        ),
+                        resources.getString(R.string.diagnostic_fade)
                     )
                 )
             } finally {
@@ -137,7 +162,11 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         images: List<CapturedImage>,
         workDirectory: File
     ): FrameSelection {
-        val normalizer = ImageNormalizer(workDirectory, REGISTRATION_MAX_DIMENSION)
+        val normalizer = ImageNormalizer(
+            temporaryDirectory = workDirectory,
+            maxDimension = REGISTRATION_MAX_DIMENSION,
+            resources = resources
+        )
         val acceptedImages = mutableListOf(images.first())
         val registrations = mutableListOf<Registration>()
         val relativeTransforms = mutableListOf<Mat>()
@@ -177,8 +206,10 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
                 }
 
                 val selected = chosen ?: error(
-                    "No coherent sequential overlap after frame ${images[anchorIndex].sequence}; " +
-                        "the movement may be too small, too fast, or contain excessive parallax"
+                    resources.getString(
+                        R.string.error_sequential_overlap,
+                        images[anchorIndex].sequence
+                    )
                 )
                 acceptedImages += images[selected.index]
                 registrations += selected.registration
@@ -201,7 +232,9 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         val normalized = normalizer.normalize(image)
         return try {
             Imgcodecs.imread(normalized.absolutePath, Imgcodecs.IMREAD_COLOR).also {
-                check(!it.empty()) { "Unable to read ${image.file.name}" }
+                check(!it.empty()) {
+                    resources.getString(R.string.error_read_image, image.file.name)
+                }
             }
         } finally {
             normalized.delete()
@@ -497,12 +530,20 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         workDirectory: File,
         output: File
     ): CompositionResult {
-        val normalizer = ImageNormalizer(workDirectory, COMPOSITION_MAX_DIMENSION)
+        // The panorama expands horizontally. Preserve the oriented frame height instead
+        // of limiting whichever side happens to be larger.
+        val normalizer = ImageNormalizer(
+            temporaryDirectory = workDirectory,
+            targetHeight = COMPOSITION_TARGET_HEIGHT,
+            resources = resources
+        )
         val sizes = images.map { image ->
             val normalized = normalizer.normalize(image)
             val probe = try {
                 Imgcodecs.imread(normalized.absolutePath, Imgcodecs.IMREAD_COLOR).also {
-                    check(!it.empty()) { "Unable to read ${image.file.name}" }
+                    check(!it.empty()) {
+                        resources.getString(R.string.error_read_image, image.file.name)
+                    }
                 }
             } finally {
                 normalized.delete()
@@ -523,14 +564,19 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
                 sizes[index]
             )
         }
-        val bounds = transformedBounds(sizes, transforms)
+        var bounds = transformedBounds(sizes, transforms)
+        val initialScale = compositionScaleFor(bounds)
+        if (initialScale < 1.0) {
+            scaleTransforms(transforms, initialScale)
+            bounds = transformedBounds(sizes, transforms)
+        }
         val canvasWidth = ceil(bounds.maxX - bounds.minX).toInt()
         val canvasHeight = ceil(bounds.maxY - bounds.minY).toInt()
         check(canvasWidth in 1..MAX_CANVAS_DIMENSION && canvasHeight in 1..MAX_CANVAS_DIMENSION) {
-            "Estimated panorama canvas is too large (${canvasWidth}x${canvasHeight})"
+            resources.getString(R.string.error_canvas_too_large, canvasWidth, canvasHeight)
         }
         check(canvasWidth.toLong() * canvasHeight <= MAX_CANVAS_PIXELS) {
-            "Estimated panorama requires too much memory (${canvasWidth}x${canvasHeight})"
+            resources.getString(R.string.error_canvas_memory, canvasWidth, canvasHeight)
         }
 
         val translation = Mat.eye(3, 3, CvType.CV_64F).also {
@@ -570,18 +616,21 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
             val safeWeight = Mat()
             val safeWeight3 = Mat()
             val normalized = Mat()
-            val points = MatOfPoint()
             try {
                 Imgproc.threshold(weightAccumulator, validThreshold, 0.01, 255.0, Imgproc.THRESH_BINARY)
                 validThreshold.convertTo(validMask, CvType.CV_8UC1)
-                check(Core.countNonZero(validMask) > 0) { "No valid panorama coverage was produced" }
-                Core.findNonZero(validMask, points)
-                val boundsRect = boundingRect(points, canvasWidth, canvasHeight)
+                check(Core.countNonZero(validMask) > 0) {
+                    resources.getString(R.string.error_no_coverage)
+                }
+                val boundsRect = coverageBounds(validMask, canvasWidth, canvasHeight)
                 val rect = largestCoveredRect(validMask, canvasWidth, canvasHeight)
                 val coverage = Core.countNonZero(validMask).toDouble() /
                     (boundsRect.width * boundsRect.height).toDouble()
                 check(coverage >= 0.55) {
-                    "Panorama contains an internal coverage gap (${(coverage * 100.0).roundToInt()}%)"
+                    resources.getString(
+                        R.string.error_coverage_gap,
+                        (coverage * 100.0).roundToInt()
+                    )
                 }
 
                 Core.add(weightAccumulator, Scalar(1.0e-6), safeWeight)
@@ -592,7 +641,7 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
                 try {
                     cropped.convertTo(output8, CvType.CV_8UC3)
                     check(Imgcodecs.imwrite(output.absolutePath, output8)) {
-                        "Unable to save panorama result"
+                        resources.getString(R.string.error_save_panorama)
                     }
                 } finally {
                     output8.release()
@@ -605,7 +654,6 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
                 safeWeight.release()
                 safeWeight3.release()
                 normalized.release()
-                points.release()
             }
         } finally {
             translation.release()
@@ -690,10 +738,10 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
     }
 
     private fun transformedBounds(sizes: List<Pair<Int, Int>>, transforms: List<Mat>): Bounds {
-        var minX = 0.0
-        var minY = 0.0
-        var maxX = sizes.first().first.toDouble()
-        var maxY = sizes.first().second.toDouble()
+        var minX = Double.POSITIVE_INFINITY
+        var minY = Double.POSITIVE_INFINITY
+        var maxX = Double.NEGATIVE_INFINITY
+        var maxY = Double.NEGATIVE_INFINITY
         sizes.forEachIndexed { index, size ->
             val corners = MatOfPoint2f(
                 Point(0.0, 0.0),
@@ -705,9 +753,11 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
             try {
                 Core.perspectiveTransform(corners, projected, transforms[index])
                 projected.toArray().forEach { point ->
-                    check(point.x.isFinite() && point.y.isFinite()) { "Invalid image transform" }
-                    check(abs(point.x) <= MAX_CANVAS_DIMENSION && abs(point.y) <= MAX_CANVAS_DIMENSION) {
-                        "Image transform is unstable"
+                    check(point.x.isFinite() && point.y.isFinite()) {
+                        resources.getString(R.string.error_invalid_transform)
+                    }
+                    check(abs(point.x) <= MAX_ESTIMATED_COORDINATE && abs(point.y) <= MAX_ESTIMATED_COORDINATE) {
+                        resources.getString(R.string.error_unstable_transform)
                     }
                     minX = min(minX, point.x)
                     minY = min(minY, point.y)
@@ -747,6 +797,32 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         return scaled
     }
 
+    private fun scaleTransforms(transforms: List<Mat>, scale: Double) {
+        val scaleMatrix = scaleMatrix(scale, scale)
+        try {
+            transforms.forEach { transform ->
+                val scaled = Mat()
+                multiply(scaleMatrix, transform, scaled)
+                scaled.copyTo(transform)
+                scaled.release()
+            }
+        } finally {
+            scaleMatrix.release()
+        }
+    }
+
+    private fun compositionScaleFor(bounds: Bounds): Double {
+        val width = max(1.0, bounds.maxX - bounds.minX)
+        val height = max(1.0, bounds.maxY - bounds.minY)
+        val pixelScale = sqrt(MAX_CANVAS_PIXELS.toDouble() / (width * height))
+        val dimensionScale = min(
+            MAX_CANVAS_DIMENSION.toDouble() / width,
+            MAX_CANVAS_DIMENSION.toDouble() / height
+        )
+        val allowedScale = min(1.0, min(pixelScale, dimensionScale))
+        return if (allowedScale < 1.0) allowedScale * 0.98 else 1.0
+    }
+
     private fun scaleMatrix(x: Double, y: Double): Mat {
         return Mat.eye(3, 3, CvType.CV_64F).also {
             it.put(0, 0, x)
@@ -760,13 +836,33 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         return max(1, image.width / sample) to max(1, image.height / sample)
     }
 
-    private fun boundingRect(points: MatOfPoint, width: Int, height: Int): Rect {
-        val all = points.toArray()
-        val minX = all.minOf { it.x }.roundToInt().coerceIn(0, width - 1)
-        val minY = all.minOf { it.y }.roundToInt().coerceIn(0, height - 1)
-        val maxX = all.maxOf { it.x }.roundToInt().coerceIn(minX + 1, width)
-        val maxY = all.maxOf { it.y }.roundToInt().coerceIn(minY + 1, height)
-        return Rect(minX, minY, maxX - minX, maxY - minY)
+    private fun coverageBounds(mask: Mat, width: Int, height: Int): Rect {
+        val row = ByteArray(width)
+        var minX = width
+        var minY = height
+        var maxX = -1
+        var maxY = -1
+        for (y in 0 until height) {
+            mask.get(y, 0, row)
+            var firstX = -1
+            var lastX = -1
+            for (x in 0 until width) {
+                if ((row[x].toInt() and 0xFF) != 0) {
+                    if (firstX < 0) firstX = x
+                    lastX = x
+                }
+            }
+            if (firstX >= 0) {
+                minX = min(minX, firstX)
+                maxX = max(maxX, lastX)
+                minY = min(minY, y)
+                maxY = y
+            }
+        }
+        check(maxX >= minX && maxY >= minY) {
+            resources.getString(R.string.error_no_coverage)
+        }
+        return Rect(minX, minY, maxX - minX + 1, maxY - minY + 1)
     }
 
     /**
@@ -815,7 +911,7 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
         }
 
         check(bestWidth > 0 && bestHeight > 0) {
-            "No fully covered panorama rectangle was produced"
+            resources.getString(R.string.error_no_full_coverage)
         }
         return Rect(bestLeft, bestTop, bestWidth, bestHeight)
     }
@@ -830,7 +926,12 @@ class OpenCvPanoramaProcessor(context: Context) : PanoramaProcessor {
     }
 
     private fun distance(first: Point, second: Point): Double {
-        return sqrt((first.x - second.x) * (first.x - second.x) + (first.y - second.y) * (first.y - second.y))
+        return sqrt(
+                (first.x - second.x) *
+                (first.x - second.x) +
+                (first.y - second.y) *
+                (first.y - second.y)
+        )
     }
 
     private fun multiply(left: Mat, right: Mat, destination: Mat) {

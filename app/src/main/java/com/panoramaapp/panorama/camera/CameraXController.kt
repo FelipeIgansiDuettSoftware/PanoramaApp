@@ -12,6 +12,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.LifecycleOwner
+import com.panoramaapp.R
 import com.panoramaapp.panorama.capture.CaptureOrientation
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -88,7 +89,7 @@ class CameraXController(context: Context) : CameraController {
     ) {
         val capture = imageCapture
         if (capture == null) {
-            onError(IllegalStateException("Camera capture is not ready"))
+            onError(IllegalStateException(appContext.getString(R.string.error_camera_capture_not_ready)))
             return
         }
         if (!photoCapturing.compareAndSet(false, true)) {
@@ -96,7 +97,7 @@ class CameraXController(context: Context) : CameraController {
         }
         if (!outputDirectory.mkdirs() && !outputDirectory.isDirectory) {
             photoCapturing.set(false)
-            onError(IllegalStateException("Unable to create photo directory"))
+            onError(IllegalStateException(appContext.getString(R.string.error_photo_directory)))
             return
         }
         val file = File(outputDirectory, "photo-${sequence.toString().padStart(4, '0')}.jpg")
@@ -115,7 +116,7 @@ class CameraXController(context: Context) : CameraController {
                         file.delete()
                         photoCapturing.set(false)
                         ContextCompat.getMainExecutor(appContext).execute {
-                            onError(IllegalStateException("Captured photo has invalid dimensions"))
+                            onError(IllegalStateException(appContext.getString(R.string.error_invalid_photo_dimensions)))
                         }
                         return
                     }
@@ -162,11 +163,11 @@ class CameraXController(context: Context) : CameraController {
     ) {
         val analysis = imageAnalysis
         if (analysis == null) {
-            onError(IllegalStateException("Camera analysis is not ready"))
+            onError(IllegalStateException(appContext.getString(R.string.error_camera_analysis_not_ready)))
             return
         }
         if (!org.opencv.android.OpenCVLoader.initLocal()) {
-            onError(IllegalStateException("OpenCV could not be initialized for alignment"))
+            onError(IllegalStateException(appContext.getString(R.string.error_opencv_alignment_init)))
             return
         }
         clearAlignmentReference()

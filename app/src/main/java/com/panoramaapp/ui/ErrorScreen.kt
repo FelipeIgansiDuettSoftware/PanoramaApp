@@ -34,7 +34,7 @@ fun ErrorScreen(message: String, onBack: () -> Unit) {
 @Composable
 private fun ErrorScreenPreview() {
     ErrorScreen(
-        message = "Not enough overlapping features (2)",
+        message = stringResource(R.string.error_preview_message),
         onBack = {}
     )
 }
